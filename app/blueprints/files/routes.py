@@ -46,3 +46,37 @@ def download(workspace_slug, file_id):
     
     return send_file(str(file_path), as_attachment=True, download_name=file.filename)
 
+
+@bp.route('/<int:file_id>/delete', methods=['POST'])
+@login_required
+def delete(workspace_slug, file_id):
+    """Delete file (only by uploader)"""
+    workspace = Workspace.query.filter_by(slug=workspace_slug).first_or_404()
+    
+    if not can_view_workspace(current_user, workspace):
+        abort(403)
+    
+    file = File.query.get_or_404(file_id)
+    if file.workspace_id != workspace.id:
+        abort(404)
+    
+    # Only the uploader can delete their own file
+    if file.uploader_id != current_user.id:
+        flash('You can only delete your own files', 'error')
+        return redirect(url_for('files.docs', workspace_slug=workspace_slug))
+    
+    # Delete physical file
+    file_path = Config.UPLOAD_FOLDER / file.storage_key
+    if file_path.exists():
+        try:
+            file_path.unlink()
+        except Exception as e:
+            print(f"Error deleting file {file_path}: {e}")
+    
+    # Delete database record
+    db.session.delete(file)
+    db.session.commit()
+    
+    flash('File deleted successfully', 'success')
+    return redirect(url_for('files.docs', workspace_slug=workspace_slug))
+

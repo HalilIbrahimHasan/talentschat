@@ -19,6 +19,7 @@ class User(UserMixin, db.Model):
     messages = db.relationship('Message', back_populates='user', cascade='all, delete-orphan')
     uploaded_files = db.relationship('File', back_populates='uploader', cascade='all, delete-orphan')
     uploaded_videos = db.relationship('Video', back_populates='uploader', cascade='all, delete-orphan')
+    articles = db.relationship('Article', back_populates='author', cascade='all, delete-orphan')
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

@@ -40,6 +40,7 @@ def view(video_id):
     video.like_count = len(video.likes)
     video.user_liked = any(like.user_id == current_user.id for like in video.likes)
     video.comments_list = VideoComment.query.filter_by(video_id=video_id).order_by(VideoComment.created_at.asc()).all()
+    video.can_delete = (video.uploader_id == current_user.id)
     
     return render_template('video/view.html', video=video)
 
@@ -58,4 +59,37 @@ def stream(video_id):
         abort(404)
     
     return send_file(str(video_path), mimetype='video/mp4')
+
+
+@bp.route('/v/<int:video_id>/delete', methods=['POST'])
+@login_required
+def delete(video_id):
+    """Delete video (only by uploader)"""
+    video = Video.query.get_or_404(video_id)
+    
+    if not can_view_workspace(current_user, video.workspace):
+        abort(403)
+    
+    # Only the uploader can delete their own video
+    if video.uploader_id != current_user.id:
+        flash('You can only delete your own videos', 'error')
+        return redirect(url_for('videos.feed', workspace_slug=video.workspace.slug))
+    
+    workspace_slug = video.workspace.slug
+    
+    # Delete physical file if it exists (not external URLs)
+    if video.storage_key:
+        video_path = Config.UPLOAD_FOLDER / video.storage_key
+        if video_path.exists():
+            try:
+                video_path.unlink()
+            except Exception as e:
+                print(f"Error deleting video {video_path}: {e}")
+    
+    # Delete database record
+    db.session.delete(video)
+    db.session.commit()
+    
+    flash('Video deleted successfully', 'success')
+    return redirect(url_for('videos.feed', workspace_slug=workspace_slug))
 

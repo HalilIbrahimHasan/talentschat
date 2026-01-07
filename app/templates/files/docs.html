@@ -4,81 +4,131 @@
 
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="flex justify-between items-center mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">Documents & Files</h1>
-        <a href="{{ url_for('workspaces.view', workspace_slug=workspace.slug) }}" class="text-indigo-600 hover:text-indigo-800">
-            <i class="fas fa-arrow-left"></i> Back to Workspace
+    <div class="flex justify-between items-center mb-10 animate-fadeInUp">
+        <div>
+            <h1 class="text-4xl font-extrabold gradient-text mb-2">📄 Documents & Files</h1>
+            <p class="text-gray-600">All your shared files and code snippets</p>
+        </div>
+        <a href="{{ url_for('workspaces.view', workspace_slug=workspace.slug) }}" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:shadow-xl transform hover:scale-105 transition font-semibold">
+            <i class="fas fa-arrow-left mr-2"></i> Back to Workspace
         </a>
     </div>
     
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div class="lg:col-span-2">
-            <h2 class="text-xl font-semibold text-gray-900 mb-4">Files</h2>
-            <div class="bg-white rounded-lg shadow overflow-hidden">
-                <div class="divide-y divide-gray-200">
-                    {% for file in files %}
-                    <div class="p-4 hover:bg-gray-50">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <i class="fas fa-file text-gray-400"></i>
-                                <div>
-                                    <p class="text-sm font-medium text-gray-900">{{ file.filename }}</p>
-                                    <p class="text-xs text-gray-500">
-                                        Uploaded by {{ file.uploader.name }} • {{ (file.size / 1024)|round(2) }} KB
-                                    </p>
+        <div class="lg:col-span-2 space-y-8">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white mr-3">
+                        <i class="fas fa-file"></i>
+                    </div>
+                    Files
+                </h2>
+                <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-blue-100">
+                    <div class="divide-y divide-gray-100">
+                        {% for file in files %}
+                        <div class="p-5 hover:bg-gradient-to-r hover:from-blue-50 to-transparent transition animate-fadeInUp" style="animation-delay: {{ loop.index0 * 0.05 }}s">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-4">
+                                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white text-xl">
+                                        <i class="fas fa-file"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-base font-semibold text-gray-900">{{ file.filename }}</p>
+                                        <p class="text-xs text-gray-600 flex items-center mt-1">
+                                            <i class="fas fa-user mr-1 text-blue-500"></i>
+                                            {{ file.uploader.name }} • 
+                                            <i class="fas fa-weight-hanging ml-2 mr-1 text-blue-500"></i>
+                                            {{ (file.size / 1024)|round(2) }} KB
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <a href="{{ url_for('files.download', workspace_slug=workspace.slug, file_id=file.id) }}" 
+                                       class="w-10 h-10 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white flex items-center justify-center hover:shadow-lg transform hover:scale-110 transition" title="Download">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                    {% if file.uploader_id == current_user.id %}
+                                    <form method="POST" 
+                                          action="{{ url_for('files.delete', workspace_slug=workspace.slug, file_id=file.id) }}" 
+                                          class="inline"
+                                          onsubmit="return confirm('Are you sure you want to delete this file?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <button type="submit" 
+                                                class="w-10 h-10 rounded-lg bg-gradient-to-r from-red-500 to-rose-600 text-white flex items-center justify-center hover:shadow-lg transform hover:scale-110 transition" 
+                                                title="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
                                 </div>
                             </div>
-                            <a href="{{ url_for('files.download', workspace_slug=workspace.slug, file_id=file.id) }}" 
-                               class="text-indigo-600 hover:text-indigo-800">
-                                <i class="fas fa-download"></i>
-                            </a>
                         </div>
+                        {% endfor %}
+                        {% if not files %}
+                        <div class="p-12 text-center">
+                            <div class="text-6xl mb-4">📁</div>
+                            <p class="text-gray-600 font-semibold">No files uploaded yet.</p>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endfor %}
-                    {% if not files %}
-                    <div class="p-8 text-center text-gray-500">
-                        No files uploaded yet.
-                    </div>
-                    {% endif %}
                 </div>
             </div>
             
-            <h2 class="text-xl font-semibold text-gray-900 mb-4 mt-8">Code Snippets</h2>
-            <div class="bg-white rounded-lg shadow overflow-hidden">
-                <div class="divide-y divide-gray-200">
-                    {% for snippet in snippets %}
-                    <div class="p-4 hover:bg-gray-50">
-                        <div class="flex items-center justify-between mb-2">
-                            <h3 class="text-sm font-medium text-gray-900">{{ snippet.title or 'Untitled' }}</h3>
-                            <span class="text-xs text-gray-500">{{ snippet.language or 'text' }}</span>
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white mr-3">
+                        <i class="fas fa-code"></i>
+                    </div>
+                    Code Snippets
+                </h2>
+                <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-purple-100">
+                    <div class="divide-y divide-gray-100">
+                        {% for snippet in snippets %}
+                        <div class="p-5 hover:bg-gradient-to-r hover:from-purple-50 to-transparent transition animate-fadeInUp" style="animation-delay: {{ loop.index0 * 0.05 }}s">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-base font-bold text-gray-900">{{ snippet.title or 'Untitled' }}</h3>
+                                <span class="text-xs bg-gradient-to-r from-purple-500 to-pink-600 text-white px-3 py-1 rounded-full font-semibold">{{ snippet.language or 'text' }}</span>
+                            </div>
+                            <pre class="bg-gradient-to-br from-gray-900 to-gray-800 text-green-400 p-4 rounded-xl text-xs overflow-x-auto border border-gray-700"><code>{{ snippet.code[:200] }}{% if snippet.code|length > 200 %}...{% endif %}</code></pre>
+                            <p class="text-xs text-gray-600 mt-3 flex items-center">
+                                <i class="fas fa-user mr-2 text-purple-500"></i>
+                                By {{ snippet.user.name }}
+                            </p>
                         </div>
-                        <pre class="bg-gray-100 p-3 rounded text-xs overflow-x-auto"><code>{{ snippet.code[:200] }}{% if snippet.code|length > 200 %}...{% endif %}</code></pre>
-                        <p class="text-xs text-gray-500 mt-2">By {{ snippet.user.name }}</p>
+                        {% endfor %}
+                        {% if not snippets %}
+                        <div class="p-12 text-center">
+                            <div class="text-6xl mb-4">💻</div>
+                            <p class="text-gray-600 font-semibold">No code snippets shared yet.</p>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endfor %}
-                    {% if not snippets %}
-                    <div class="p-8 text-center text-gray-500">
-                        No code snippets shared yet.
-                    </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
         
         <div>
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Links</h3>
-                <ul class="space-y-2">
+            <div class="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-2xl p-6 text-white sticky top-4">
+                <h3 class="text-xl font-bold mb-6 flex items-center">
+                    <i class="fas fa-link mr-3"></i> Quick Links
+                </h3>
+                <ul class="space-y-3">
                     <li>
                         <a href="{{ url_for('workspaces.view', workspace_slug=workspace.slug) }}" 
-                           class="text-indigo-600 hover:text-indigo-800">
-                            <i class="fas fa-home"></i> Workspace Home
+                           class="block bg-white/20 backdrop-blur-sm px-4 py-3 rounded-xl hover:bg-white/30 transition font-medium">
+                            <i class="fas fa-home mr-2"></i> Workspace Home
                         </a>
                     </li>
                     <li>
                         <a href="{{ url_for('videos.feed', workspace_slug=workspace.slug) }}" 
-                           class="text-indigo-600 hover:text-indigo-800">
-                            <i class="fas fa-video"></i> Videos
+                           class="block bg-white/20 backdrop-blur-sm px-4 py-3 rounded-xl hover:bg-white/30 transition font-medium">
+                            <i class="fas fa-video mr-2"></i> Videos
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('articles.list', workspace_slug=workspace.slug) }}" 
+                           class="block bg-white/20 backdrop-blur-sm px-4 py-3 rounded-xl hover:bg-white/30 transition font-medium">
+                            <i class="fas fa-newspaper mr-2"></i> Articles
                         </a>
                     </li>
                 </ul>

@@ -4,62 +4,105 @@
 
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="flex justify-between items-center mb-8">
+    <div class="flex justify-between items-center mb-10 animate-fadeInUp">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900">{{ workspace.name }}</h1>
-            {% if workspace.is_public %}
-            <span class="text-sm text-green-600"><i class="fas fa-globe"></i> Public Workspace</span>
-            {% else %}
-            <span class="text-sm text-gray-600"><i class="fas fa-lock"></i> Private Workspace</span>
-            {% endif %}
+            <div class="flex items-center space-x-3 mb-2">
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                    {{ workspace.name[0].upper() }}
+                </div>
+                <div>
+                    <h1 class="text-4xl font-extrabold gradient-text">{{ workspace.name }}</h1>
+                    {% if workspace.is_public %}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow mt-2">
+                        <i class="fas fa-globe mr-2"></i> Public Workspace
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-gradient-to-r from-gray-500 to-gray-600 text-white shadow mt-2">
+                        <i class="fas fa-lock mr-2"></i> Private Workspace
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
         </div>
-        <div class="flex space-x-2">
+        <div class="flex space-x-3">
             <a href="{{ url_for('workspaces.invite', workspace_slug=workspace.slug) }}" 
-               class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-                <i class="fas fa-user-plus"></i> Invite
+               class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-xl hover:shadow-xl transform hover:scale-105 transition font-semibold shadow-lg">
+                <i class="fas fa-user-plus mr-2"></i> Invite
             </a>
             <a href="{{ url_for('channels.create', workspace_slug=workspace.slug) }}" 
-               class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
-                <i class="fas fa-plus"></i> Create Channel
+               class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:shadow-xl transform hover:scale-105 transition font-semibold shadow-lg">
+                <i class="fas fa-plus mr-2"></i> Create Channel
             </a>
         </div>
     </div>
     
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {% for channel in channels %}
-        <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
-            <div class="flex items-center justify-between mb-2">
-                <h3 class="text-xl font-semibold text-gray-900">
-                    <i class="fas fa-hashtag"></i> {{ channel.name }}
-                </h3>
-                {% if channel.is_private %}
-                <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">Private</span>
-                {% endif %}
+    {% if channels %}
+    <div class="mb-8">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+            <i class="fas fa-hashtag mr-3 text-indigo-600"></i> Channels
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for channel in channels %}
+            <div class="bg-gradient-to-br from-white to-indigo-50 rounded-2xl shadow-lg p-6 hover:shadow-2xl transition-all duration-300 card-hover border border-indigo-100 animate-fadeInUp" style="animation-delay: {{ loop.index0 * 0.1 }}s">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold">
+                        <i class="fas fa-hashtag"></i>
+                    </div>
+                    {% if channel.is_private %}
+                    <span class="text-xs bg-gradient-to-r from-gray-500 to-gray-600 text-white px-3 py-1 rounded-full font-semibold shadow">🔒 Private</span>
+                    {% else %}
+                    <span class="text-xs bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-3 py-1 rounded-full font-semibold shadow">🌐 Public</span>
+                    {% endif %}
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-4">{{ channel.name }}</h3>
+                <a href="{{ url_for('channels.view', workspace_slug=workspace.slug, channel_slug=channel.slug) }}" 
+                   class="block w-full text-center bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3 rounded-xl hover:from-indigo-700 hover:to-purple-700 transition font-semibold shadow-md">
+                    Open channel <i class="fas fa-arrow-right ml-2"></i>
+                </a>
             </div>
-            <a href="{{ url_for('channels.view', workspace_slug=workspace.slug, channel_slug=channel.slug) }}" 
-               class="text-indigo-600 hover:text-indigo-800">
-                Open channel <i class="fas fa-arrow-right ml-1"></i>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="mt-10">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+            <i class="fas fa-th-large mr-3 text-purple-600"></i> Quick Access
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <a href="{{ url_for('files.docs', workspace_slug=workspace.slug) }}" 
+               class="bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl shadow-lg p-8 hover:shadow-2xl transition-all duration-300 card-hover text-white animate-fadeInUp">
+                <div class="text-5xl mb-4">📄</div>
+                <h3 class="text-2xl font-bold mb-2">Documents</h3>
+                <p class="text-blue-100">View all shared files and documents</p>
+                <div class="mt-4 flex items-center text-blue-100">
+                    <span class="font-semibold">Explore</span>
+                    <i class="fas fa-arrow-right ml-2"></i>
+                </div>
+            </a>
+            
+            <a href="{{ url_for('videos.feed', workspace_slug=workspace.slug) }}" 
+               class="bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl shadow-lg p-8 hover:shadow-2xl transition-all duration-300 card-hover text-white animate-fadeInUp" style="animation-delay: 0.1s">
+                <div class="text-5xl mb-4">🎥</div>
+                <h3 class="text-2xl font-bold mb-2">Videos</h3>
+                <p class="text-pink-100">Browse video feed and recordings</p>
+                <div class="mt-4 flex items-center text-pink-100">
+                    <span class="font-semibold">Watch</span>
+                    <i class="fas fa-arrow-right ml-2"></i>
+                </div>
+            </a>
+            
+            <a href="{{ url_for('articles.list', workspace_slug=workspace.slug) }}" 
+               class="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl shadow-lg p-8 hover:shadow-2xl transition-all duration-300 card-hover text-white animate-fadeInUp" style="animation-delay: 0.2s">
+                <div class="text-5xl mb-4">📰</div>
+                <h3 class="text-2xl font-bold mb-2">Articles</h3>
+                <p class="text-purple-100">Read and write articles</p>
+                <div class="mt-4 flex items-center text-purple-100">
+                    <span class="font-semibold">Read</span>
+                    <i class="fas fa-arrow-right ml-2"></i>
+                </div>
             </a>
         </div>
-        {% endfor %}
-    </div>
-    
-    <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <a href="{{ url_for('files.docs', workspace_slug=workspace.slug) }}" 
-           class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
-            <h3 class="text-xl font-semibold text-gray-900 mb-2">
-                <i class="fas fa-file-alt"></i> Documents
-            </h3>
-            <p class="text-gray-600">View all shared files and documents</p>
-        </a>
-        
-        <a href="{{ url_for('videos.feed', workspace_slug=workspace.slug) }}" 
-           class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
-            <h3 class="text-xl font-semibold text-gray-900 mb-2">
-                <i class="fas fa-video"></i> Videos
-            </h3>
-            <p class="text-gray-600">Browse video feed</p>
-        </a>
     </div>
 </div>
 {% endblock %}

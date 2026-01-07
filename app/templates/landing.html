@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block title %}TalentsChat - TalentifyLab Student Communication Platform{% endblock %}
+
+{% block extra_head %}
+{% set bg_url = url_for('static', filename='images/background.png') %}
+<style>
+    .hero-background {
+        position: relative;
+        min-height: 100vh;
+        background-image: url("{{ bg_url }}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }
+    
+    .hero-background::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 0;
+    }
+    
+    .hero-background > * {
+        position: relative;
+        z-index: 1;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Section with Educational Background -->
+<div class="hero-background educational-pattern min-h-screen">
+    <div class="relative z-10">
+        <!-- Navigation -->
+        <nav class="bg-white/10 backdrop-blur-md border-b border-white/20">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <div class="flex items-center">
+                        <h1 class="text-2xl font-bold text-white">
+                            <i class="fas fa-graduation-cap"></i> TalentsChat
+                        </h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <a href="{{ url_for('auth.login') }}" 
+                           class="text-white hover:text-gray-200 px-4 py-2 rounded-lg hover:bg-white/10 transition">
+                            Login
+                        </a>
+                        <a href="{{ url_for('auth.register') }}" 
+                           class="bg-white text-indigo-600 px-6 py-2 rounded-lg hover:bg-gray-100 font-semibold transition">
+                            Get Started
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Hero Content -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+            <div class="text-center">
+                <h1 class="text-5xl md:text-6xl font-extrabold text-white mb-6">
+                    Welcome to TalentsChat
+                </h1>
+                <p class="text-xl md:text-2xl text-white/90 mb-8 max-w-3xl mx-auto">
+                    The exclusive communication platform for TalentifyLab students. Connect, collaborate, and learn together in a modern, gamified environment.
+                </p>
+                <div class="flex justify-center space-x-4">
+                    <a href="{{ url_for('auth.register') }}" 
+                       class="bg-white text-indigo-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 transition shadow-lg">
+                        Join Now
+                    </a>
+                    <a href="#features" 
+                       class="bg-white/20 backdrop-blur-md text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-white/30 transition border border-white/30">
+                        Learn More
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- About TalentifyLab Section -->
+<div class="bg-white py-20" id="features">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                About TalentifyLab
+            </h2>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                TalentifyLab is a dynamic gamified platform that transforms learning into an engaging experience. 
+                Through cutting-edge technology and a refined curriculum led by experienced instructors, students 
+                cultivate both technical and soft skills.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+            <div class="bg-gradient-to-br from-indigo-50 to-purple-50 p-8 rounded-xl">
+                <div class="text-4xl mb-4">🎮</div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">Gamified Learning</h3>
+                <p class="text-gray-600">
+                    Earn points, experience, and level up as you progress through courses. Learning becomes fun and engaging!
+                </p>
+            </div>
+            
+            <div class="bg-gradient-to-br from-blue-50 to-cyan-50 p-8 rounded-xl">
+                <div class="text-4xl mb-4">👥</div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">Personalized Guidance</h3>
+                <p class="text-gray-600">
+                    Get personalized support throughout your courses with immersive project-based learning and comprehensive mentoring.
+                </p>
+            </div>
+            
+            <div class="bg-gradient-to-br from-pink-50 to-rose-50 p-8 rounded-xl">
+                <div class="text-4xl mb-4">🚀</div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">Career Ready</h3>
+                <p class="text-gray-600">
+                    Connect with Digital Ignition's network of 95+ IT companies for internships and full-time opportunities.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TalentsChat Features -->
+<div class="bg-gray-50 py-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl font-bold text-gray-900 mb-4">
+                TalentsChat Features
+            </h2>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                Your dedicated communication hub for TalentifyLab students
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div class="text-3xl mb-4 text-indigo-600">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Real-time Chat</h3>
+                <p class="text-gray-600 text-sm">
+                    Instant messaging with emoji reactions, highlights, and file sharing
+                </p>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div class="text-3xl mb-4 text-indigo-600">
+                    <i class="fas fa-video"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Video Sharing</h3>
+                <p class="text-gray-600 text-sm">
+                    Record yourself, share your screen, or upload videos up to 30 minutes
+                </p>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div class="text-3xl mb-4 text-indigo-600">
+                    <i class="fas fa-newspaper"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Articles & Docs</h3>
+                <p class="text-gray-600 text-sm">
+                    Write articles, share documents, and collaborate on projects
+                </p>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div class="text-3xl mb-4 text-indigo-600">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Workspaces</h3>
+                <p class="text-gray-600 text-sm">
+                    Create private or public workspaces for different courses and projects
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Contact Information -->
+<div class="bg-indigo-600 text-white py-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+            <div>
+                <h2 class="text-3xl font-bold mb-6">Get in Touch</h2>
+                <div class="space-y-4">
+                    <div class="flex items-start space-x-4">
+                        <i class="fas fa-phone text-2xl mt-1"></i>
+                        <div>
+                            <p class="font-semibold">Phone</p>
+                            <p class="text-indigo-100">+1 (202) 499-8460</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start space-x-4">
+                        <i class="fas fa-envelope text-2xl mt-1"></i>
+                        <div>
+                            <p class="font-semibold">Email</p>
+                            <p class="text-indigo-100">kalini@novatechit.com</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start space-x-4">
+                        <i class="fas fa-map-marker-alt text-2xl mt-1"></i>
+                        <div>
+                            <p class="font-semibold">Address</p>
+                            <p class="text-indigo-100">
+                                Digital Ignition<br>
+                                Bluegrass Valley Parkway<br>
+                                Alpharetta, GA 30005
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div>
+                <h2 class="text-3xl font-bold mb-6">Connected Platforms</h2>
+                <div class="space-y-4">
+                    <div class="bg-white/10 backdrop-blur-md p-6 rounded-lg">
+                        <h3 class="text-xl font-semibold mb-2">TalentifyLab</h3>
+                        <p class="text-indigo-100 mb-4">
+                            Your comprehensive learning platform with gamified courses, personalized guidance, and career preparation.
+                        </p>
+                        <a href="https://talentifylab.com/en" 
+                           target="_blank" 
+                           rel="noopener noreferrer"
+                           class="inline-flex items-center text-white hover:text-indigo-200 font-semibold">
+                            Visit TalentifyLab <i class="fas fa-external-link-alt ml-2"></i>
+                        </a>
+                    </div>
+                    
+                    <div class="bg-white/10 backdrop-blur-md p-6 rounded-lg">
+                        <h3 class="text-xl font-semibold mb-2">Digital Ignition</h3>
+                        <p class="text-indigo-100">
+                            Innovation hub connecting TalentifyLab students with 95+ IT companies for internships and career opportunities.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CTA Section -->
+<div class="bg-white py-20">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h2 class="text-4xl font-bold text-gray-900 mb-6">
+            Ready to Start Your Journey?
+        </h2>
+        <p class="text-xl text-gray-600 mb-8">
+            Join TalentsChat and connect with fellow TalentifyLab students. Start collaborating, sharing knowledge, and building your future today.
+        </p>
+        <a href="{{ url_for('auth.register') }}" 
+           class="inline-block bg-indigo-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-indigo-700 transition shadow-lg">
+            Create Your Account
+        </a>
+    </div>
+</div>
+
+<!-- Footer -->
+<footer class="bg-gray-900 text-gray-300 py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div>
+                <h3 class="text-white font-semibold text-lg mb-4">TalentsChat</h3>
+                <p class="text-sm">
+                    Exclusive communication platform for TalentifyLab students. Built with modern technology for seamless collaboration.
+                </p>
+            </div>
+            
+            <div>
+                <h3 class="text-white font-semibold text-lg mb-4">Quick Links</h3>
+                <ul class="space-y-2 text-sm">
+                    <li><a href="{{ url_for('auth.login') }}" class="hover:text-white">Login</a></li>
+                    <li><a href="{{ url_for('auth.register') }}" class="hover:text-white">Register</a></li>
+                    <li><a href="https://talentifylab.com/en" target="_blank" class="hover:text-white">TalentifyLab</a></li>
+                </ul>
+            </div>
+            
+            <div>
+                <h3 class="text-white font-semibold text-lg mb-4">Contact</h3>
+                <ul class="space-y-2 text-sm">
+                    <li><i class="fas fa-phone mr-2"></i> +1 (202) 499-8460</li>
+                    <li><i class="fas fa-envelope mr-2"></i> kalini@novatechit.com</li>
+                    <li><i class="fas fa-map-marker-alt mr-2"></i> Digital Ignition, Alpharetta, GA</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="border-t border-gray-800 mt-8 pt-8 text-center text-sm">
+            <p>&copy; 2026 TalentsChat. All rights reserved. Powered by Novatech IT.</p>
+        </div>
+    </div>
+</footer>
+{% endblock %}
+

@@ -32,6 +32,9 @@ def create_app(config_class=Config):
     from app.blueprints.videos import bp as videos_bp
     app.register_blueprint(videos_bp)
     
+    from app.blueprints.articles import bp as articles_bp
+    app.register_blueprint(articles_bp)
+    
     from app.blueprints.api import bp as api_bp
     # Exempt API routes from CSRF (they use JSON)
     csrf.exempt(api_bp)
@@ -62,10 +65,10 @@ def create_app(config_class=Config):
     @app.route('/')
     def index():
         from flask_login import current_user
-        from flask import redirect, url_for
+        from flask import render_template, redirect, url_for
         if current_user.is_authenticated:
             return redirect(url_for('workspaces.dashboard'))
-        return redirect(url_for('auth.login'))
+        return render_template('landing.html')
     
     # Create tables and migrate schema
     with app.app_context():

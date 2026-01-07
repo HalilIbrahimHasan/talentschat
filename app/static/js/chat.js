@@ -31,6 +31,30 @@ function initSocket() {
     
     socket.on('joined_room', (data) => {
         console.log('✅ Joined room:', data);
+        if (data.online_users) {
+            updateOnlineUsers(data.online_users);
+        }
+    });
+    
+    socket.on('presence_updated', (data) => {
+        console.log('👥 Presence updated:', data);
+        if (data.online_users) {
+            updateOnlineUsers(data.online_users);
+        }
+    });
+    
+    socket.on('joined_room', (data) => {
+        console.log('✅ Joined room:', data);
+        if (data.online_users) {
+            updateOnlineUsers(data.online_users);
+        }
+    });
+    
+    socket.on('presence_updated', (data) => {
+        console.log('👥 Presence updated:', data);
+        if (data.online_users) {
+            updateOnlineUsers(data.online_users);
+        }
     });
     
     socket.on('connected', (data) => {
@@ -71,7 +95,9 @@ function addMessageToUI(message) {
     messageDiv.id = `message-${message.id}`;
     
     const isOwn = message.user_id === CURRENT_USER_ID;
-    const bgColor = isOwn ? 'bg-indigo-50' : 'bg-white';
+    const bgGradient = isOwn 
+        ? 'bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-50 border-2 border-indigo-300' 
+        : 'bg-gradient-to-br from-white to-blue-50 border-2 border-blue-200';
     
     // Build reactions HTML - ensure we have the reactions array
     const reactions = message.reactions || [];
@@ -79,25 +105,36 @@ function addMessageToUI(message) {
     const reactionsHtml = buildReactionsHtml(reactions, message.id);
     console.log(`📦 Reactions HTML for message ${message.id}:`, reactionsHtml);
     
+    // Random gradient for avatar
+    const avatarGradients = [
+        'from-indigo-500 to-purple-600',
+        'from-blue-500 to-cyan-600',
+        'from-pink-500 to-rose-600',
+        'from-green-500 to-emerald-600',
+        'from-yellow-500 to-orange-600',
+        'from-purple-500 to-indigo-600'
+    ];
+    const avatarGradient = avatarGradients[message.user_id % avatarGradients.length];
+    
     messageDiv.innerHTML = `
-        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm">
+        <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-lg font-bold shadow-lg">
             ${message.user_name.charAt(0).toUpperCase()}
         </div>
-        <div class="flex-1 ${bgColor} rounded-lg p-3">
-            <div class="flex items-center justify-between mb-1">
-                <span class="text-sm font-medium text-gray-900">${message.user_name}</span>
-                <span class="text-xs text-gray-500">${formatTime(message.created_at)}</span>
+        <div class="flex-1 ${bgGradient} rounded-2xl p-4 shadow-md hover:shadow-lg transition">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-bold ${isOwn ? 'text-indigo-700' : 'text-gray-900'}">${message.user_name}</span>
+                <span class="text-xs ${isOwn ? 'text-indigo-600' : 'text-gray-500'} font-medium">${formatTime(message.created_at)}</span>
             </div>
-            <div class="text-gray-700 mb-2">${message.content_html || message.content}</div>
+            <div class="text-gray-800 mb-3 leading-relaxed">${message.content_html || message.content}</div>
             ${detectAndEmbedVideos(message.content)}
             <div id="reactions-wrapper-${message.id}" class="reactions-wrapper">
                 ${reactionsHtml}
             </div>
-            <div class="flex items-center space-x-2 mt-2">
-                <button class="emoji-picker-btn text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-100" data-message-id="${message.id}">
+            <div class="flex items-center space-x-2 mt-3">
+                <button class="emoji-picker-btn text-xs font-semibold ${isOwn ? 'text-indigo-600 hover:text-indigo-800' : 'text-gray-600 hover:text-gray-800'} px-3 py-2 rounded-lg hover:bg-white/50 transition" data-message-id="${message.id}">
                     😀 Add Reaction
                 </button>
-                <button class="highlight-btn text-xs text-gray-500 hover:text-yellow-600 px-2 py-1 rounded hover:bg-gray-100" data-message-id="${message.id}">
+                <button class="highlight-btn text-xs font-semibold ${isOwn ? 'text-yellow-600 hover:text-yellow-800' : 'text-yellow-600 hover:text-yellow-800'} px-3 py-2 rounded-lg hover:bg-yellow-50 transition" data-message-id="${message.id}">
                     ⭐ Highlight
                 </button>
             </div>
@@ -152,16 +189,31 @@ function buildReactionsHtml(reactions, messageId = null) {
         return `<div class="reactions-container mt-2 flex flex-wrap gap-1" data-message-id="${msgId}"></div>`;
     }
     
-    let html = `<div class="reactions-container mt-2 flex flex-wrap gap-1" data-message-id="${msgId}">`;
+    // Color gradients for different emojis
+    const emojiColors = {
+        '👍': 'from-green-400 to-emerald-500',
+        '❤️': 'from-red-400 to-pink-500',
+        '😂': 'from-yellow-400 to-orange-500',
+        '😮': 'from-blue-400 to-cyan-500',
+        '😢': 'from-indigo-400 to-purple-500',
+        '🔥': 'from-red-500 to-orange-500',
+        '🎉': 'from-yellow-400 to-pink-500',
+        '👏': 'from-purple-400 to-indigo-500',
+        '😀': 'from-yellow-400 to-orange-500',
+        '😍': 'from-pink-400 to-rose-500'
+    };
+    
+    let html = `<div class="reactions-container mt-2 flex flex-wrap gap-2" data-message-id="${msgId}">`;
     for (const [emoji, users] of Object.entries(reactionGroups)) {
         const count = users.length;
         const userReacted = users.some(r => r.user_id === CURRENT_USER_ID);
-        const bgClass = userReacted ? 'bg-indigo-100 border-indigo-300' : 'bg-gray-100 border-gray-300';
+        const gradient = emojiColors[emoji] || 'from-indigo-400 to-purple-500';
+        const shadowClass = userReacted ? 'shadow-lg ring-2 ring-white' : 'shadow-md';
         html += `
-            <button class="reaction-item ${bgClass} border rounded-full px-2 py-1 text-xs flex items-center space-x-1 hover:bg-indigo-50 cursor-pointer" 
+            <button class="reaction-item bg-gradient-to-r ${gradient} ${shadowClass} text-white rounded-full px-3 py-1.5 text-sm flex items-center space-x-1 hover:shadow-xl transform hover:scale-110 transition cursor-pointer font-semibold" 
                     data-emoji="${emoji}" data-message-id="${msgId}">
-                <span class="text-lg">${emoji}</span>
-                <span class="text-gray-600 font-medium ml-1">${count}</span>
+                <span class="text-base">${emoji}</span>
+                <span class="ml-1">${count}</span>
             </button>
         `;
     }
@@ -603,6 +655,50 @@ function updateReaction(data) {
     
     console.log('✅ Reactions updated successfully!');
     console.log('🔍 Reactions wrapper after update:', reactionsWrapper.innerHTML);
+}
+
+function updateOnlineUsers(users) {
+    const onlineUsersDiv = document.getElementById('onlineUsers');
+    if (!onlineUsersDiv) return;
+    
+    if (!users || users.length === 0) {
+        onlineUsersDiv.innerHTML = '<div class="text-xs text-gray-400">No one online</div>';
+        return;
+    }
+    
+    // Remove current user from list (they see themselves as "You")
+    const filteredUsers = users.filter(u => u.id !== CURRENT_USER_ID);
+    
+    let html = '';
+    
+    // Show current user first
+    const currentUser = users.find(u => u.id === CURRENT_USER_ID);
+    if (currentUser) {
+        html += `
+            <div class="flex items-center space-x-2 px-2 py-1 rounded text-xs">
+                <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span class="text-gray-700 font-medium">You</span>
+            </div>
+        `;
+    }
+    
+    // Show other online users
+    filteredUsers.forEach(user => {
+        html += `
+            <div class="flex items-center space-x-2 px-2 py-1 rounded text-xs">
+                <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span class="text-gray-700">${escapeHtml(user.name)}</span>
+            </div>
+        `;
+    });
+    
+    onlineUsersDiv.innerHTML = html;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 function updateHighlight(data) {

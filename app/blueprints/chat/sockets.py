@@ -6,6 +6,11 @@ from app.models.channel import Channel
 from app.models.message import Message, MessageReaction, MessageHighlight
 from app.services.permissions import can_view_channel
 from datetime import datetime
+from collections import defaultdict
+
+# Track online users per workspace/channel
+# Structure: {room: {user_id: {'name': str, 'socket_id': str}}}
+online_users = defaultdict(dict)
 
 
 @socketio.on('connect')
@@ -13,13 +18,36 @@ def on_connect():
     """Handle client connection"""
     if not current_user.is_authenticated:
         return False
+    print(f"✅ User {current_user.id} ({current_user.name}) connected, socket ID: {request.sid}")
     emit('connected', {'user_id': current_user.id, 'name': current_user.name})
 
 
 @socketio.on('disconnect')
 def on_disconnect():
     """Handle client disconnection"""
-    pass
+    if not current_user.is_authenticated:
+        return
+    
+    print(f"❌ User {current_user.id} ({current_user.name}) disconnected, socket ID: {request.sid}")
+    
+    # Remove user from all rooms they were in
+    rooms_to_update = []
+    for room, users in online_users.items():
+        if current_user.id in users and users[current_user.id].get('socket_id') == request.sid:
+            del users[current_user.id]
+            rooms_to_update.append(room)
+    
+    # Emit presence updates for affected rooms
+    for room in rooms_to_update:
+        channel_id = room.split(':')[-1] if ':' in room else None
+        if channel_id:
+            emit('presence_updated', {
+                'channel_id': int(channel_id),
+                'online_users': [{'id': uid, 'name': info['name']} for uid, info in online_users[room].items()],
+                'user_id': current_user.id,
+                'user_name': current_user.name,
+                'status': 'offline'
+            }, room=room)
 
 
 @socketio.on('join_room')
@@ -45,21 +73,67 @@ def on_join_room(data):
     
     room = f'ws:{channel.workspace_id}:ch:{channel_id}'
     join_room(room)
+    
+    # Add user to online users for this room
+    online_users[room][current_user.id] = {
+        'name': current_user.name,
+        'socket_id': request.sid
+    }
+    
     print(f"✅ User {current_user.id} joined room {room}")
-    emit('joined_room', {'room': room, 'channel_id': channel_id})
+    
+    # Get all online users in this room
+    online_users_list = [{'id': uid, 'name': info['name']} for uid, info in online_users[room].items()]
+    
+    # Emit joined_room with online users
+    emit('joined_room', {
+        'room': room, 
+        'channel_id': channel_id,
+        'online_users': online_users_list
+    })
+    
+    # Notify others in the room about new user
+    emit('presence_updated', {
+        'channel_id': channel_id,
+        'online_users': online_users_list,
+        'user_id': current_user.id,
+        'user_name': current_user.name,
+        'status': 'online'
+    }, room=room, include_self=False)
+    
     return True
 
 
 @socketio.on('leave_room')
 def on_leave_room(data):
     """Leave workspace+channel room"""
+    if not current_user.is_authenticated:
+        return
+    
     channel_id = data.get('channel_id')
     if channel_id:
         channel = Channel.query.get(channel_id)
         if channel:
             room = f'ws:{channel.workspace_id}:ch:{channel_id}'
             leave_room(room)
+            
+            # Remove user from online users
+            if current_user.id in online_users[room]:
+                del online_users[room][current_user.id]
+            
+            # Get updated online users list
+            online_users_list = [{'id': uid, 'name': info['name']} for uid, info in online_users[room].items()]
+            
             emit('left_room', {'room': room})
+            
+            # Notify others in the room
+            emit('presence_updated', {
+                'channel_id': channel_id,
+                'online_users': online_users_list,
+                'user_id': current_user.id,
+                'user_name': current_user.name,
+                'status': 'offline'
+            }, room=room, include_self=False)
 
 
 @socketio.on('send_message')

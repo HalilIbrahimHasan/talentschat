@@ -2,13 +2,48 @@
 
 {% block title %}Register - TalentsChat{% endblock %}
 
+{% block extra_head %}
+<style>
+    .register-background {
+        position: relative;
+        min-height: 100vh;
+        background-image: url("{{ url_for('static', filename='images/loginpic.png') }}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }
+    
+    .register-background::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 0;
+    }
+    
+    .register-background > * {
+        position: relative;
+        z-index: 1;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8">
+<div class="register-background flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8 bg-white/95 backdrop-blur-sm rounded-lg shadow-2xl p-8">
         <div>
+            <div class="text-center mb-4">
+                <i class="fas fa-graduation-cap text-5xl text-indigo-600 mb-4"></i>
+            </div>
             <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
                 Create your account
             </h2>
+            <p class="mt-2 text-center text-sm text-gray-600">
+                Join TalentsChat - TalentifyLab's exclusive student platform
+            </p>
         </div>
         <form class="mt-8 space-y-6" method="POST">
             {{ form.hidden_tag() }}

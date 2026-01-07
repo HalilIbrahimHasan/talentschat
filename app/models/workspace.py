@@ -20,6 +20,7 @@ class Workspace(db.Model):
     channels = db.relationship('Channel', back_populates='workspace', cascade='all, delete-orphan')
     files = db.relationship('File', back_populates='workspace', cascade='all, delete-orphan')
     videos = db.relationship('Video', back_populates='workspace', cascade='all, delete-orphan')
+    articles = db.relationship('Article', back_populates='workspace', cascade='all, delete-orphan')
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
