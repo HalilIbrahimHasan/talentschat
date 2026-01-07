@@ -59,7 +59,7 @@
                 <div class="flex items-center justify-between text-sm">
                     <a href="{{ url_for('profile.view_user', user_id=video.uploader.id) }}" class="flex items-center space-x-3 hover:opacity-80 transition">
                         {% if video.uploader.profile_image %}
-                        <img src="{{ url_for('static', filename='../uploads/' + video.uploader.profile_image) }}" 
+                        <img src="{{ url_for('profile.serve_image', filename=video.uploader.profile_image) }}" 
                              alt="{{ video.uploader.name }}" 
                              class="w-8 h-8 rounded-full object-cover border-2 border-indigo-200">
                         {% else %}

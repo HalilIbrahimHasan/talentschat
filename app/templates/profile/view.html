@@ -9,7 +9,7 @@
         <div class="flex items-start space-x-6">
             <div class="flex-shrink-0">
                 {% if user.profile_image %}
-                <img src="{{ url_for('static', filename='../uploads/' + user.profile_image) }}" 
+                <img src="{{ url_for('profile.serve_image', filename=user.profile_image) }}" 
                      alt="{{ user.name }}" 
                      class="w-32 h-32 rounded-2xl object-cover border-4 border-white shadow-xl">
                 {% else %}

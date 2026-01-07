@@ -22,7 +22,7 @@
                 <div class="flex items-center space-x-4">
                     <a href="{{ url_for('profile.view') }}" class="flex items-center space-x-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full hover:bg-white/30 transition">
                         {% if current_user.profile_image %}
-                        <img src="{{ url_for('static', filename='../uploads/' + current_user.profile_image) }}" 
+                        <img src="{{ url_for('profile.serve_image', filename=current_user.profile_image) }}" 
                              alt="{{ current_user.name }}" 
                              class="w-8 h-8 rounded-full object-cover border-2 border-white">
                         {% else %}

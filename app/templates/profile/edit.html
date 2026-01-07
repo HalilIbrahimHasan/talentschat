@@ -27,7 +27,7 @@
             </label>
             {% if current_user.profile_image %}
             <div class="mb-4">
-                <img src="{{ url_for('static', filename='../uploads/' + current_user.profile_image) }}" 
+                <img src="{{ url_for('profile.serve_image', filename=current_user.profile_image) }}" 
                      alt="Current profile" 
                      class="w-24 h-24 rounded-xl object-cover border-2 border-indigo-200">
             </div>
