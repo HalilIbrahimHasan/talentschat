@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}{{ video.title or 'Video' }} - TalentsChat{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="aspect-video bg-black">
+            <video id="videoPlayer" controls class="w-full h-full" src="{{ url_for('videos.stream', video_id=video.id) }}"></video>
+        </div>
+        <div class="p-6">
+            <div class="flex items-start justify-between mb-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900 mb-2">{{ video.title or 'Untitled Video' }}</h1>
+                    <p class="text-gray-600">{{ video.description or '' }}</p>
+                </div>
+                <button id="likeBtn" class="flex items-center space-x-2 px-4 py-2 rounded-lg border {% if video.user_liked %}bg-red-50 border-red-200 text-red-600{% else %}bg-gray-50 border-gray-200 text-gray-600{% endif %} hover:bg-red-50 hover:border-red-200 hover:text-red-600">
+                    <i class="fas fa-heart"></i>
+                    <span id="likeCount">{{ video.like_count }}</span>
+                </button>
+            </div>
+            
+            <div class="border-t pt-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-gray-900">Comments</h2>
+                </div>
+                
+                <form id="commentForm" class="mb-6">
+                    <div class="flex space-x-2">
+                        <input type="text" id="commentInput" placeholder="Add a comment..." 
+                               class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                            Post
+                        </button>
+                    </div>
+                </form>
+                
+                <div id="comments" class="space-y-4">
+                    {% for comment in video.comments_list %}
+                    <div class="border-b pb-4">
+                        <div class="flex items-start space-x-3">
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-gray-900">{{ comment.user.name }}</p>
+                                <p class="text-gray-700 mt-1">{{ comment.content }}</p>
+                                <p class="text-xs text-gray-500 mt-1">{{ comment.created_at.strftime('%b %d, %Y at %I:%M %p') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const VIDEO_ID = {{ video.id }};
+</script>
+<script src="{{ url_for('static', filename='js/videos.js') }}"></script>
+{% endblock %}
+

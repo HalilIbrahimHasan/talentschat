@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}{{ workspace.name }} - TalentsChat{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">{{ workspace.name }}</h1>
+            {% if workspace.is_public %}
+            <span class="text-sm text-green-600"><i class="fas fa-globe"></i> Public Workspace</span>
+            {% else %}
+            <span class="text-sm text-gray-600"><i class="fas fa-lock"></i> Private Workspace</span>
+            {% endif %}
+        </div>
+        <div class="flex space-x-2">
+            <a href="{{ url_for('workspaces.invite', workspace_slug=workspace.slug) }}" 
+               class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                <i class="fas fa-user-plus"></i> Invite
+            </a>
+            <a href="{{ url_for('channels.create', workspace_slug=workspace.slug) }}" 
+               class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+                <i class="fas fa-plus"></i> Create Channel
+            </a>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for channel in channels %}
+        <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xl font-semibold text-gray-900">
+                    <i class="fas fa-hashtag"></i> {{ channel.name }}
+                </h3>
+                {% if channel.is_private %}
+                <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">Private</span>
+                {% endif %}
+            </div>
+            <a href="{{ url_for('channels.view', workspace_slug=workspace.slug, channel_slug=channel.slug) }}" 
+               class="text-indigo-600 hover:text-indigo-800">
+                Open channel <i class="fas fa-arrow-right ml-1"></i>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <a href="{{ url_for('files.docs', workspace_slug=workspace.slug) }}" 
+           class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">
+                <i class="fas fa-file-alt"></i> Documents
+            </h3>
+            <p class="text-gray-600">View all shared files and documents</p>
+        </a>
+        
+        <a href="{{ url_for('videos.feed', workspace_slug=workspace.slug) }}" 
+           class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">
+                <i class="fas fa-video"></i> Videos
+            </h3>
+            <p class="text-gray-600">Browse video feed</p>
+        </a>
+    </div>
+</div>
+{% endblock %}
+

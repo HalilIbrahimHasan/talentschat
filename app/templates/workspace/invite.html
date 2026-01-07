@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Invite to {{ workspace.name }} - TalentsChat{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="bg-white rounded-lg shadow p-6">
+        <h1 class="text-2xl font-bold text-gray-900 mb-4">Invite People to {{ workspace.name }}</h1>
+        
+        <div class="space-y-6">
+            <!-- Invite Link -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Invite Link</label>
+                <div class="flex space-x-2">
+                    <input type="text" id="inviteLink" value="{{ invite_link }}" readonly
+                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
+                    <button onclick="copyInviteLink()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Invite Code -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Invite Code</label>
+                <div class="flex space-x-2">
+                    <input type="text" id="inviteCode" value="{{ workspace.invite_code }}" readonly
+                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 font-mono text-lg text-center">
+                    <button onclick="copyInviteCode()" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                </div>
+            </div>
+            
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p class="text-sm text-blue-800">
+                    <i class="fas fa-info-circle"></i> Share the invite link or code with people you want to invite. 
+                    They can use either to join this workspace.
+                </p>
+            </div>
+            
+            <div class="flex space-x-4">
+                <a href="{{ url_for('workspaces.view', workspace_slug=workspace.slug) }}" 
+                   class="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300">
+                    Back to Workspace
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyInviteLink() {
+    const link = document.getElementById('inviteLink');
+    link.select();
+    document.execCommand('copy');
+    alert('Invite link copied to clipboard!');
+}
+
+function copyInviteCode() {
+    const code = document.getElementById('inviteCode');
+    code.select();
+    document.execCommand('copy');
+    alert('Invite code copied to clipboard!');
+}
+</script>
+{% endblock %}
+

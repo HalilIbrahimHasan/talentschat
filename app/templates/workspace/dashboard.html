@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Workspaces - TalentsChat{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Your Workspaces</h1>
+        <a href="{{ url_for('workspaces.create') }}" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+            <i class="fas fa-plus"></i> Create Workspace
+        </a>
+    </div>
+    
+    {% if workspaces %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+        {% for workspace in workspaces %}
+        <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xl font-semibold text-gray-900">{{ workspace.name }}</h3>
+                {% if workspace.owner_id == current_user.id %}
+                <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded">Owner</span>
+                {% endif %}
+            </div>
+            <p class="text-gray-600 text-sm mb-4">Created {{ workspace.created_at.strftime('%B %Y') }}</p>
+            <div class="flex items-center space-x-2">
+                <a href="{{ url_for('workspaces.view', workspace_slug=workspace.slug) }}" 
+                   class="text-indigo-600 hover:text-indigo-800 flex-1 text-center">
+                    Open <i class="fas fa-arrow-right ml-1"></i>
+                </a>
+                <a href="{{ url_for('workspaces.invite', workspace_slug=workspace.slug) }}" 
+                   class="text-gray-600 hover:text-gray-800 px-3 py-1 border border-gray-300 rounded hover:bg-gray-50">
+                    <i class="fas fa-user-plus"></i> Invite
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12 mb-12">
+        <p class="text-gray-600 mb-4">You don't have any workspaces yet.</p>
+        <a href="{{ url_for('workspaces.create') }}" class="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 inline-block">
+            Create your first workspace
+        </a>
+    </div>
+    {% endif %}
+    
+    <!-- Public Workspaces Section -->
+    {% if public_workspaces %}
+    <div class="mt-12">
+        <h2 class="text-2xl font-bold text-gray-900 mb-6">Discover Public Workspaces</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for workspace in public_workspaces %}
+            <div class="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-xl font-semibold text-gray-900">{{ workspace.name }}</h3>
+                    <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Public</span>
+                </div>
+                <p class="text-gray-600 text-sm mb-2">By {{ workspace.owner.name }}</p>
+                <p class="text-gray-500 text-xs mb-4">{{ workspace.members|length }} members</p>
+                <a href="{{ url_for('workspaces.join', workspace_slug=workspace.slug) }}" 
+                   class="block w-full text-center bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+                    <i class="fas fa-sign-in-alt"></i> Join Workspace
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
