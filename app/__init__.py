@@ -99,6 +99,23 @@ def create_app(config_class=Config):
                 db.session.commit()
                 print(f"Generated invite codes for {len(workspaces)} existing workspaces")
             
+            # Migrate videos table to add new columns
+            try:
+                result = conn.execute(text("PRAGMA table_info(videos)"))
+                video_columns = [row[1] for row in result]
+                
+                if 'external_url' not in video_columns:
+                    conn.execute(text("ALTER TABLE videos ADD COLUMN external_url VARCHAR(500)"))
+                    conn.commit()
+                    print("Added external_url column to videos")
+                
+                if 'video_type' not in video_columns:
+                    conn.execute(text("ALTER TABLE videos ADD COLUMN video_type VARCHAR(20) DEFAULT 'upload'"))
+                    conn.commit()
+                    print("Added video_type column to videos")
+            except Exception as ve:
+                print(f"Video migration note: {ve}")
+            
             conn.close()
         except Exception as e:
             print(f"Migration note: {e}")

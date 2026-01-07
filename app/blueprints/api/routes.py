@@ -47,6 +47,10 @@ def get_messages(channel_id):
         if not created_at_iso.endswith('Z') and '+' not in created_at_iso:
             created_at_iso += 'Z'  # Add Z to indicate UTC
         
+        # Check for video links in message
+        from app.utils.video_embed import detect_video_url
+        video_info = detect_video_url(m.content)
+        
         result.append({
             'id': m.id,
             'user_id': m.user_id,
@@ -56,7 +60,8 @@ def get_messages(channel_id):
             'created_at': created_at_iso,
             'reply_to_id': m.reply_to_id,
             'reactions': reaction_data,
-            'highlighted': any(h.highlighted_by == current_user.id for h in m.highlights)
+            'highlighted': any(h.highlighted_by == current_user.id for h in m.highlights),
+            'video_info': video_info
         })
     
     return jsonify(result)
@@ -227,6 +232,7 @@ def upload():
     file_type_param = request.form.get('type', 'documents')
     workspace_id = request.form.get('workspace_id', type=int)
     channel_id = request.form.get('channel_id', type=int)
+    video_type = request.form.get('video_type', 'upload')  # 'upload', 'recording', 'screen_share'
     
     if not workspace_id:
         return jsonify({'error': 'Missing workspace_id'}), 400
@@ -269,7 +275,8 @@ def upload():
                 channel_id=channel_id,
                 uploader_id=current_user.id,
                 title=file.filename,
-                storage_key=str(storage_key)
+                storage_key=str(storage_key),
+                video_type=video_type  # 'upload', 'recording', 'screen_share'
             )
             db.session.add(video)
             db.session.commit()
@@ -278,7 +285,8 @@ def upload():
                 'type': 'video',
                 'id': video.id,
                 'filename': file.filename,
-                'storage_key': str(storage_key)
+                'storage_key': str(storage_key),
+                'video_type': video_type
             }), 201
         else:
             # Create file record

@@ -89,6 +89,7 @@ function addMessageToUI(message) {
                 <span class="text-xs text-gray-500">${formatTime(message.created_at)}</span>
             </div>
             <div class="text-gray-700 mb-2">${message.content_html || message.content}</div>
+            ${detectAndEmbedVideos(message.content)}
             <div id="reactions-wrapper-${message.id}" class="reactions-wrapper">
                 ${reactionsHtml}
             </div>
@@ -293,6 +294,61 @@ function toggleEmojiPicker(messageId) {
             }
         });
     }, 100);
+}
+
+function detectAndEmbedVideos(text) {
+    if (!text) return '';
+    
+    let embedHtml = '';
+    
+    // YouTube
+    const youtubePattern = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/g;
+    let match;
+    const foundIds = new Set(); // Avoid duplicates
+    
+    while ((match = youtubePattern.exec(text)) !== null) {
+        const videoId = match[1];
+        if (!foundIds.has(videoId)) {
+            foundIds.add(videoId);
+            embedHtml += `
+                <div class="my-3">
+                    <iframe width="100%" height="315" 
+                        src="https://www.youtube.com/embed/${videoId}" 
+                        frameborder="0" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowfullscreen
+                        class="rounded-lg"
+                        style="max-width: 560px;">
+                    </iframe>
+                </div>
+            `;
+        }
+    }
+    
+    // Vimeo
+    const vimeoPattern = /(?:https?:\/\/)?(?:www\.)?vimeo\.com\/(\d+)/g;
+    foundIds.clear();
+    while ((match = vimeoPattern.exec(text)) !== null) {
+        const videoId = match[1];
+        if (!foundIds.has(videoId)) {
+            foundIds.add(videoId);
+            embedHtml += `
+                <div class="my-3">
+                    <iframe src="https://player.vimeo.com/video/${videoId}" 
+                        width="100%" 
+                        height="315" 
+                        frameborder="0" 
+                        allow="autoplay; fullscreen; picture-in-picture" 
+                        allowfullscreen
+                        class="rounded-lg"
+                        style="max-width: 560px;">
+                    </iframe>
+                </div>
+            `;
+        }
+    }
+    
+    return embedHtml;
 }
 
 function formatTime(isoString) {

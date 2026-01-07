@@ -11,7 +11,9 @@ class Video(db.Model):
     uploader_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     title = db.Column(db.String(200), nullable=True)
     description = db.Column(db.Text, nullable=True)
-    storage_key = db.Column(db.String(255), nullable=False)  # path to file
+    storage_key = db.Column(db.String(255), nullable=True)  # path to file (nullable for external URLs)
+    external_url = db.Column(db.String(500), nullable=True)  # For social media links (YouTube, Vimeo, etc.)
+    video_type = db.Column(db.String(20), default='upload', nullable=False)  # 'upload', 'recording', 'screen_share', 'external'
     duration = db.Column(db.Integer, nullable=True)  # seconds
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
     

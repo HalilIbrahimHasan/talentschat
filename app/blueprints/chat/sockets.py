@@ -71,6 +71,7 @@ def on_send_message(data):
     channel_id = data.get('channel_id')
     content = data.get('content', '').strip()
     reply_to_id = data.get('reply_to_id')
+    video_id = data.get('video_id')  # For uploaded recordings
     
     if not channel_id or not content:
         return False
@@ -78,6 +79,10 @@ def on_send_message(data):
     channel = Channel.query.get(channel_id)
     if not channel or not can_view_channel(current_user, channel):
         return False
+    
+    # Check for social media video links
+    from app.utils.video_embed import detect_video_url
+    video_info = detect_video_url(content)
     
     # Create message
     message = Message(
@@ -88,6 +93,30 @@ def on_send_message(data):
     )
     message.set_content_html()
     db.session.add(message)
+    db.session.flush()  # Get message ID
+    
+    # Create video record if link detected or video_id provided
+    if video_id:
+        # Link message to uploaded video
+        video = Video.query.get(video_id)
+        if video:
+            video.channel_id = channel_id
+            db.session.commit()
+    elif video_info:
+        # Create external video record
+        from app.models.video import Video
+        video = Video(
+            workspace_id=channel.workspace_id,
+            channel_id=channel_id,
+            uploader_id=current_user.id,
+            title=f"Shared {video_info['type']} video",
+            external_url=video_info['url'],
+            video_type='external',
+            storage_key=None
+        )
+        db.session.add(video)
+        db.session.commit()
+    
     db.session.commit()
     
     # Emit to room

@@ -78,11 +78,19 @@
         <div class="bg-white border-t p-4">
             <form id="messageForm" class="flex space-x-2">
                 <input type="text" id="messageInput" 
-                       placeholder="Type a message..." 
+                       placeholder="Type a message or paste a video link (YouTube, Vimeo, etc.)..." 
                        class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <button type="button" id="fileUploadBtn" class="px-4 py-2 text-gray-600 hover:text-gray-900">
-                    <i class="fas fa-paperclip"></i>
-                </button>
+                <div class="flex space-x-1">
+                    <button type="button" id="recordBtn" class="px-3 py-2 text-gray-600 hover:text-red-600" title="Record video">
+                        <i class="fas fa-video"></i>
+                    </button>
+                    <button type="button" id="screenShareBtn" class="px-3 py-2 text-gray-600 hover:text-indigo-600" title="Share screen">
+                        <i class="fas fa-desktop"></i>
+                    </button>
+                    <button type="button" id="fileUploadBtn" class="px-3 py-2 text-gray-600 hover:text-gray-900" title="Upload file">
+                        <i class="fas fa-paperclip"></i>
+                    </button>
+                </div>
                 <input type="file" id="fileInput" class="hidden" multiple>
                 <button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
                     Send
@@ -147,9 +155,35 @@
     const WORKSPACE_ID = {{ workspace.id }};
     const CURRENT_USER_ID = {{ current_user.id }};
 </script>
+<!-- Recording Modal -->
+<div id="recordingModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4">
+        <h3 class="text-lg font-semibold mb-4">
+            <i class="fas fa-circle text-red-500 animate-pulse"></i> Recording...
+        </h3>
+        <div id="recordingWarning" class="hidden mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800"></div>
+        <video id="previewVideo" autoplay muted class="w-full rounded-lg bg-black mb-4" style="max-height: 400px;"></video>
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-600">Duration: <span id="recordingTimer" class="font-mono font-semibold">00:00</span></p>
+                <p class="text-xs text-gray-500 mt-1">Max 30 minutes</p>
+            </div>
+            <div class="flex space-x-2">
+                <button id="cancelRecordingBtn" class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                    Cancel
+                </button>
+                <button id="stopRecordingBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                    <i class="fas fa-stop"></i> Stop & Upload
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 <script src="{{ url_for('static', filename='js/uploads.js') }}"></script>
 <script src="{{ url_for('static', filename='js/reactions.js') }}"></script>
 <script src="{{ url_for('static', filename='js/highlights.js') }}"></script>
+<script src="{{ url_for('static', filename='js/recording.js') }}"></script>
 {% endblock %}
 
