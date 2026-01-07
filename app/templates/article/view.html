@@ -31,12 +31,23 @@
             </div>
             
             <div class="flex items-center space-x-6 flex-wrap">
-                <div class="flex items-center space-x-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-4 py-2 rounded-xl">
+                <a href="{{ url_for('profile.view_user', user_id=article.author.id) }}" class="flex items-center space-x-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-4 py-2 rounded-xl hover:opacity-90 transition">
+                    {% if article.author.profile_image %}
+                    <img src="{{ url_for('profile.serve_image', filename=article.author.profile_image) }}" 
+                         alt="{{ article.author.name }}" 
+                         class="w-8 h-8 rounded-full object-cover border-2 border-white/30">
+                    {% else %}
                     <div class="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center font-bold">
                         {{ article.author.name[0].upper() }}
                     </div>
+                    {% endif %}
                     <span class="font-semibold">{{ article.author.name }}</span>
-                </div>
+                    {% if article.author.has_gold_badge %}
+                    <span class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                        <i class="fas fa-medal"></i>
+                    </span>
+                    {% endif %}
+                </a>
                 <div class="flex items-center space-x-2 bg-gradient-to-r from-blue-500 to-cyan-600 text-white px-4 py-2 rounded-xl">
                     <i class="fas fa-calendar"></i>
                     <span class="font-semibold">{{ article.created_at.strftime('%B %d, %Y') }}</span>

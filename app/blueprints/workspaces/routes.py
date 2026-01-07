@@ -90,7 +90,11 @@ def view(workspace_slug):
     # Filter channels user can access
     accessible_channels = [ch for ch in channels if can_view_channel(current_user, ch)]
     
-    return render_template('workspace/view.html', workspace=workspace, channels=accessible_channels)
+    # Get workspace members
+    memberships = WorkspaceMember.query.filter_by(workspace_id=workspace.id).all()
+    members = [m.user for m in memberships]
+    
+    return render_template('workspace/view.html', workspace=workspace, channels=accessible_channels, members=members)
 
 
 @bp.route('/<workspace_slug>/join', methods=['GET', 'POST'])

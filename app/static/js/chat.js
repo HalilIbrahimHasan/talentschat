@@ -117,12 +117,12 @@ function addMessageToUI(message) {
     const avatarGradient = avatarGradients[message.user_id % avatarGradients.length];
     
     messageDiv.innerHTML = `
-        <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-lg font-bold shadow-lg">
+        <a href="/profile/${message.user_id}" class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-white text-lg font-bold shadow-lg hover:shadow-xl transform hover:scale-105 transition cursor-pointer">
             ${message.user_name.charAt(0).toUpperCase()}
-        </div>
+        </a>
         <div class="flex-1 ${bgGradient} rounded-2xl p-4 shadow-md hover:shadow-lg transition">
             <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-bold ${isOwn ? 'text-indigo-700' : 'text-gray-900'}">${message.user_name}</span>
+                <a href="/profile/${message.user_id}" class="text-sm font-bold ${isOwn ? 'text-indigo-700' : 'text-gray-900'} hover:underline transition">${message.user_name}</a>
                 <span class="text-xs ${isOwn ? 'text-indigo-600' : 'text-gray-500'} font-medium">${formatTime(message.created_at)}</span>
             </div>
             <div class="text-gray-800 mb-3 leading-relaxed">${message.content_html || message.content}</div>
@@ -685,10 +685,10 @@ function updateOnlineUsers(users) {
     // Show other online users
     filteredUsers.forEach(user => {
         html += `
-            <div class="flex items-center space-x-2 px-2 py-1 rounded text-xs">
+            <a href="/profile/${user.id}" class="flex items-center space-x-2 px-2 py-1 rounded text-xs hover:bg-white/20 transition">
                 <div class="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span class="text-gray-700">${escapeHtml(user.name)}</span>
-            </div>
+                <span class="text-white/90 hover:text-white">${escapeHtml(user.name)}</span>
+            </a>
         `;
     });
     

@@ -36,7 +36,15 @@
                                         <p class="text-base font-semibold text-gray-900">{{ file.filename }}</p>
                                         <p class="text-xs text-gray-600 flex items-center mt-1">
                                             <i class="fas fa-user mr-1 text-blue-500"></i>
-                                            {{ file.uploader.name }} • 
+                                            <a href="{{ url_for('profile.view_user', user_id=file.uploader.id) }}" class="hover:underline hover:text-blue-600 transition">
+                                                {{ file.uploader.name }}
+                                            </a>
+                                            {% if file.uploader.has_gold_badge %}
+                                            <span class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-1.5 py-0.5 rounded-full text-xs font-bold ml-1">
+                                                <i class="fas fa-medal"></i>
+                                            </span>
+                                            {% endif %}
+                                            • 
                                             <i class="fas fa-weight-hanging ml-2 mr-1 text-blue-500"></i>
                                             {{ (file.size / 1024)|round(2) }} KB
                                         </p>
@@ -92,7 +100,14 @@
                             <pre class="bg-gradient-to-br from-gray-900 to-gray-800 text-green-400 p-4 rounded-xl text-xs overflow-x-auto border border-gray-700"><code>{{ snippet.code[:200] }}{% if snippet.code|length > 200 %}...{% endif %}</code></pre>
                             <p class="text-xs text-gray-600 mt-3 flex items-center">
                                 <i class="fas fa-user mr-2 text-purple-500"></i>
-                                By {{ snippet.user.name }}
+                                By <a href="{{ url_for('profile.view_user', user_id=snippet.user.id) }}" class="hover:underline hover:text-purple-600 transition">
+                                    {{ snippet.user.name }}
+                                </a>
+                                {% if snippet.user.has_gold_badge %}
+                                <span class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-1.5 py-0.5 rounded-full text-xs font-bold ml-1">
+                                    <i class="fas fa-medal"></i>
+                                </span>
+                                {% endif %}
                             </p>
                         </div>
                         {% endfor %}

@@ -65,6 +65,37 @@
     </div>
     {% endif %}
     
+    <!-- Members Section -->
+    {% if members %}
+    <div class="mt-10 mb-10">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+            <i class="fas fa-users mr-3 text-indigo-600"></i> Members ({{ members|length }})
+        </h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {% for member in members %}
+            <a href="{{ url_for('profile.view_user', user_id=member.id) }}" 
+               class="bg-gradient-to-br from-white to-indigo-50 rounded-xl shadow-lg p-4 hover:shadow-xl transition-all duration-300 card-hover border border-indigo-100 text-center animate-fadeInUp" style="animation-delay: {{ loop.index0 * 0.05 }}s">
+                {% if member.profile_image %}
+                <img src="{{ url_for('profile.serve_image', filename=member.profile_image) }}" 
+                     alt="{{ member.name }}" 
+                     class="w-16 h-16 rounded-xl object-cover border-2 border-indigo-200 mx-auto mb-2">
+                {% else %}
+                <div class="w-16 h-16 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold mx-auto mb-2">
+                    {{ member.name[0].upper() }}
+                </div>
+                {% endif %}
+                <p class="text-sm font-semibold text-gray-900 mb-1">{{ member.name }}</p>
+                {% if member.has_gold_badge %}
+                <span class="inline-block bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-bold">
+                    <i class="fas fa-medal"></i>
+                </span>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
     <div class="mt-10">
         <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
             <i class="fas fa-th-large mr-3 text-purple-600"></i> Quick Access

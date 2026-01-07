@@ -24,7 +24,7 @@ def feed(workspace_slug):
     for video in videos:
         video.like_count = len(video.likes)
         video.user_liked = any(like.user_id == current_user.id for like in video.likes)
-        video.total_stars = video.total_stars
+        # total_stars is a property, accessed directly in templates
         user_star = VideoStar.query.filter_by(
             video_id=video.id,
             user_id=current_user.id
@@ -45,7 +45,7 @@ def view(video_id):
     
     video.like_count = len(video.likes)
     video.user_liked = any(like.user_id == current_user.id for like in video.likes)
-    video.total_stars = video.total_stars
+    # total_stars is a property, accessed directly in templates
     video.user_star = VideoStar.query.filter_by(
         video_id=video_id,
         user_id=current_user.id
