@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Profile - TalentsChat{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mb-6 animate-fadeInUp">
+        <a href="{{ url_for('profile.view') }}" 
+           class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:shadow-xl transform hover:scale-105 transition font-semibold inline-flex items-center">
+            <i class="fas fa-arrow-left mr-2"></i> Back to Profile
+        </a>
+    </div>
+    
+    <div class="text-center mb-10 animate-fadeInUp">
+        <div class="text-6xl mb-4">👤</div>
+        <h1 class="text-4xl font-extrabold gradient-text mb-3">Edit Profile</h1>
+        <p class="text-gray-600 text-lg">Update your profile information</p>
+    </div>
+    
+    <form method="POST" enctype="multipart/form-data" class="bg-gradient-to-br from-white to-indigo-50 rounded-2xl shadow-2xl p-8 border-4 border-indigo-200 animate-fadeInUp">
+        {{ form.hidden_tag() }}
+        
+        <div class="mb-6">
+            <label for="profile_image" class="block text-sm font-bold text-gray-800 mb-3 flex items-center">
+                <i class="fas fa-image mr-2 text-indigo-600"></i>
+                Profile Image
+            </label>
+            {% if current_user.profile_image %}
+            <div class="mb-4">
+                <img src="{{ url_for('static', filename='../uploads/' + current_user.profile_image) }}" 
+                     alt="Current profile" 
+                     class="w-24 h-24 rounded-xl object-cover border-2 border-indigo-200">
+            </div>
+            {% endif %}
+            {{ form.profile_image(class="w-full px-5 py-3 border-2 border-indigo-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition") }}
+            <p class="text-sm text-gray-600 mt-2">JPG, PNG, GIF or WEBP (max 10MB)</p>
+        </div>
+        
+        <div class="mb-6">
+            <label for="name" class="block text-sm font-bold text-gray-800 mb-3 flex items-center">
+                <i class="fas fa-user mr-2 text-indigo-600"></i>
+                Name <span class="text-red-500 ml-1">*</span>
+            </label>
+            {{ form.name(class="w-full px-5 py-4 border-2 border-indigo-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-lg transition") }}
+        </div>
+        
+        <div class="mb-6">
+            <label for="email" class="block text-sm font-bold text-gray-800 mb-3 flex items-center">
+                <i class="fas fa-envelope mr-2 text-indigo-600"></i>
+                Email <span class="text-red-500 ml-1">*</span>
+            </label>
+            {{ form.email(class="w-full px-5 py-4 border-2 border-indigo-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-lg transition") }}
+        </div>
+        
+        <div class="mb-8">
+            <label for="bio" class="block text-sm font-bold text-gray-800 mb-3 flex items-center">
+                <i class="fas fa-align-left mr-2 text-indigo-600"></i>
+                Bio
+            </label>
+            {{ form.bio(class="w-full px-5 py-4 border-2 border-indigo-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition", rows="4", placeholder="Tell us about yourself...") }}
+            <p class="text-sm text-gray-600 mt-2">Maximum 500 characters</p>
+        </div>
+        
+        <div class="flex space-x-4">
+            <button type="submit" 
+                    class="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-4 rounded-xl hover:shadow-xl transform hover:scale-105 transition font-bold text-lg">
+                <i class="fas fa-save mr-2"></i> Update Profile
+            </button>
+            <a href="{{ url_for('profile.change_password') }}" 
+               class="bg-gradient-to-r from-gray-500 to-gray-600 text-white px-8 py-4 rounded-xl hover:shadow-lg transform hover:scale-105 transition font-semibold">
+                <i class="fas fa-key mr-2"></i> Change Password
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+

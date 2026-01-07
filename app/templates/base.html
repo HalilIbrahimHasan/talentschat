@@ -20,12 +20,18 @@
                     </a>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <div class="flex items-center space-x-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full">
+                    <a href="{{ url_for('profile.view') }}" class="flex items-center space-x-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full hover:bg-white/30 transition">
+                        {% if current_user.profile_image %}
+                        <img src="{{ url_for('static', filename='../uploads/' + current_user.profile_image) }}" 
+                             alt="{{ current_user.name }}" 
+                             class="w-8 h-8 rounded-full object-cover border-2 border-white">
+                        {% else %}
                         <div class="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-bold text-sm">
                             {{ current_user.name[0].upper() }}
                         </div>
+                        {% endif %}
                         <span class="text-white font-medium">{{ current_user.name }}</span>
-                    </div>
+                    </a>
                     <a href="{{ url_for('auth.logout') }}" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition backdrop-blur-sm">
                         <i class="fas fa-sign-out-alt"></i> Logout
                     </a>

@@ -5,7 +5,7 @@ from app.blueprints.api import bp
 from app.models.channel import Channel
 from app.models.message import Message, MessageReaction, MessageHighlight
 from app.models.file import File, Snippet
-from app.models.video import Video, VideoLike, VideoComment
+from app.models.video import Video, VideoLike, VideoComment, VideoStar
 from app.extensions import db
 from app.services.permissions import can_view_channel, can_view_workspace
 from app.services.upload_service import save_uploaded_file, get_file_type, allowed_file
@@ -311,6 +311,57 @@ def upload():
             }), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/videos/<int:video_id>/star', methods=['POST'])
+@login_required
+def toggle_video_star(video_id):
+    """Toggle star on video (1-5 stars)"""
+    video = Video.query.get_or_404(video_id)
+    
+    if not can_view_workspace(current_user, video.workspace):
+        abort(403)
+    
+    data = request.get_json() or {}
+    stars = int(data.get('stars', 1))
+    
+    # Validate stars (1-5)
+    if stars < 1 or stars > 5:
+        return jsonify({'error': 'Stars must be between 1 and 5'}), 400
+    
+    star = VideoStar.query.filter_by(
+        video_id=video_id,
+        user_id=current_user.id
+    ).first()
+    
+    if star:
+        if star.stars == stars:
+            # Remove star if clicking same rating
+            db.session.delete(star)
+            action = 'removed'
+        else:
+            # Update star rating
+            star.stars = stars
+            action = 'updated'
+    else:
+        star = VideoStar(
+            video_id=video_id,
+            user_id=current_user.id,
+            stars=stars
+        )
+        db.session.add(star)
+        action = 'added'
+    
+    db.session.commit()
+    
+    # Get total stars for this video
+    total_stars = video.total_stars
+    
+    return jsonify({
+        'action': action,
+        'stars': stars,
+        'total_stars': total_stars
+    })
 
 
 @bp.route('/videos/<int:video_id>/comments', methods=['POST'])

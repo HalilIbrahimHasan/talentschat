@@ -23,12 +23,23 @@
                     <p class="text-lg text-gray-600">{{ video.description }}</p>
                     {% endif %}
                     <div class="flex items-center space-x-4 mt-4">
-                        <div class="flex items-center space-x-2">
+                        <a href="{{ url_for('profile.view_user', user_id=video.uploader.id) }}" class="flex items-center space-x-2 hover:opacity-80 transition">
+                            {% if video.uploader.profile_image %}
+                            <img src="{{ url_for('static', filename='../uploads/' + video.uploader.profile_image) }}" 
+                                 alt="{{ video.uploader.name }}" 
+                                 class="w-10 h-10 rounded-full object-cover border-2 border-indigo-200">
+                            {% else %}
                             <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold">
                                 {{ video.uploader.name[0].upper() }}
                             </div>
+                            {% endif %}
                             <span class="font-semibold text-gray-700">{{ video.uploader.name }}</span>
-                        </div>
+                            {% if video.uploader.has_gold_badge %}
+                            <span class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                                <i class="fas fa-medal"></i>
+                            </span>
+                            {% endif %}
+                        </a>
                         <span class="text-gray-500">
                             <i class="fas fa-calendar mr-1"></i>
                             {{ video.created_at.strftime('%B %d, %Y') }}
@@ -40,6 +51,19 @@
                         <i class="fas fa-heart"></i>
                         <span id="likeCount">{{ video.like_count }}</span>
                     </button>
+                    <div class="flex items-center space-x-1 bg-gradient-to-r from-yellow-400 to-orange-500 px-4 py-3 rounded-xl shadow-lg">
+                        <button id="starBtn" class="flex items-center space-x-2 text-white font-semibold">
+                            <i class="fas fa-star"></i>
+                            <span id="starCount">{{ video.total_stars }}</span>
+                        </button>
+                        <div id="starPicker" class="hidden absolute bg-white rounded-lg shadow-xl p-2 mt-12 z-10">
+                            {% for i in range(1, 6) %}
+                            <button class="star-option px-3 py-2 hover:bg-yellow-100 rounded {% if video.user_star_rating == i %}bg-yellow-100{% endif %}" data-stars="{{ i }}">
+                                {% for j in range(i) %}⭐{% endfor %}
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </div>
                     {% if video.uploader_id == current_user.id %}
                     <form method="POST" 
                           action="{{ url_for('videos.delete', video_id=video.id) }}" 
@@ -76,11 +100,26 @@
                     {% for comment in video.comments_list %}
                     <div class="bg-gradient-to-br from-white to-indigo-50 p-5 rounded-xl border border-indigo-100 shadow-sm hover:shadow-md transition">
                         <div class="flex items-start space-x-4">
-                            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold flex-shrink-0">
-                                {{ comment.user.name[0].upper() }}
-                            </div>
+                            <a href="{{ url_for('profile.view_user', user_id=comment.user.id) }}" class="flex-shrink-0 hover:opacity-80 transition">
+                                {% if comment.user.profile_image %}
+                                <img src="{{ url_for('static', filename='../uploads/' + comment.user.profile_image) }}" 
+                                     alt="{{ comment.user.name }}" 
+                                     class="w-10 h-10 rounded-full object-cover border-2 border-indigo-200">
+                                {% else %}
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                                    {{ comment.user.name[0].upper() }}
+                                </div>
+                                {% endif %}
+                            </a>
                             <div class="flex-1">
-                                <p class="text-sm font-bold text-gray-900 mb-1">{{ comment.user.name }}</p>
+                                <div class="flex items-center space-x-2 mb-1">
+                                    <p class="text-sm font-bold text-gray-900">{{ comment.user.name }}</p>
+                                    {% if comment.user.has_gold_badge %}
+                                    <span class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-bold">
+                                        <i class="fas fa-medal"></i>
+                                    </span>
+                                    {% endif %}
+                                </div>
                                 <p class="text-gray-700 mb-2">{{ comment.content }}</p>
                                 <p class="text-xs text-gray-500 flex items-center">
                                     <i class="fas fa-clock mr-1"></i>
@@ -98,7 +137,43 @@
 
 <script>
     const VIDEO_ID = {{ video.id }};
+    const USER_STAR_RATING = {{ video.user_star_rating }};
 </script>
 <script src="{{ url_for('static', filename='js/videos.js') }}"></script>
+<script>
+    // Star functionality
+    document.getElementById('starBtn')?.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const picker = document.getElementById('starPicker');
+        picker.classList.toggle('hidden');
+    });
+    
+    document.querySelectorAll('.star-option').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const stars = parseInt(this.dataset.stars);
+            fetch(`/api/videos/${VIDEO_ID}/star`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ stars: stars })
+            })
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('starCount').textContent = data.total_stars;
+                document.getElementById('starPicker').classList.add('hidden');
+                location.reload(); // Refresh to show updated star
+            });
+        });
+    });
+    
+    // Close star picker when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#starBtn') && !e.target.closest('#starPicker')) {
+            document.getElementById('starPicker')?.classList.add('hidden');
+        }
+    });
+</script>
 {% endblock %}
 

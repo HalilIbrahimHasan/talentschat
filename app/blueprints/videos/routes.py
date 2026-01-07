@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from pathlib import Path
 from app.blueprints.videos import bp
 from app.models.workspace import Workspace
-from app.models.video import Video, VideoLike, VideoComment
+from app.models.video import Video, VideoLike, VideoComment, VideoStar
 from app.extensions import db
 from app.services.permissions import can_view_workspace
 from app.config import Config
@@ -20,10 +20,16 @@ def feed(workspace_slug):
     
     videos = Video.query.filter_by(workspace_id=workspace.id).order_by(Video.created_at.desc()).all()
     
-    # Get like counts and user's likes
+    # Get like counts, stars, and user's likes
     for video in videos:
         video.like_count = len(video.likes)
         video.user_liked = any(like.user_id == current_user.id for like in video.likes)
+        video.total_stars = video.total_stars
+        user_star = VideoStar.query.filter_by(
+            video_id=video.id,
+            user_id=current_user.id
+        ).first()
+        video.user_star_rating = user_star.stars if user_star else 0
     
     return render_template('video/feed.html', workspace=workspace, videos=videos)
 
@@ -39,6 +45,12 @@ def view(video_id):
     
     video.like_count = len(video.likes)
     video.user_liked = any(like.user_id == current_user.id for like in video.likes)
+    video.total_stars = video.total_stars
+    video.user_star = VideoStar.query.filter_by(
+        video_id=video_id,
+        user_id=current_user.id
+    ).first()
+    video.user_star_rating = video.user_star.stars if video.user_star else 0
     video.comments_list = VideoComment.query.filter_by(video_id=video_id).order_by(VideoComment.created_at.asc()).all()
     video.can_delete = (video.uploader_id == current_user.id)
     

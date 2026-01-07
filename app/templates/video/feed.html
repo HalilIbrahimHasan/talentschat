@@ -57,16 +57,31 @@
                 <p class="text-sm text-gray-600 mb-4">{{ video.description }}</p>
                 {% endif %}
                 <div class="flex items-center justify-between text-sm">
-                    <div class="flex items-center space-x-3">
+                    <a href="{{ url_for('profile.view_user', user_id=video.uploader.id) }}" class="flex items-center space-x-3 hover:opacity-80 transition">
+                        {% if video.uploader.profile_image %}
+                        <img src="{{ url_for('static', filename='../uploads/' + video.uploader.profile_image) }}" 
+                             alt="{{ video.uploader.name }}" 
+                             class="w-8 h-8 rounded-full object-cover border-2 border-indigo-200">
+                        {% else %}
                         <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
                             {{ video.uploader.name[0].upper() }}
                         </div>
+                        {% endif %}
                         <span class="font-medium text-gray-700">{{ video.uploader.name }}</span>
-                    </div>
+                        {% if video.uploader.has_gold_badge %}
+                        <span class="bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-2 py-0.5 rounded-full text-xs font-bold">
+                            <i class="fas fa-medal"></i>
+                        </span>
+                        {% endif %}
+                    </a>
                     <div class="flex items-center space-x-4">
                         <span class="flex items-center bg-gradient-to-r from-red-500 to-pink-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
                             <i class="fas fa-heart mr-1"></i>
                             {{ video.like_count }}
+                        </span>
+                        <span class="flex items-center bg-gradient-to-r from-yellow-500 to-orange-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                            <i class="fas fa-star mr-1"></i>
+                            {{ video.total_stars }}
                         </span>
                         <span class="text-gray-500 text-xs">{{ video.created_at.strftime('%b %d') }}</span>
                     </div>

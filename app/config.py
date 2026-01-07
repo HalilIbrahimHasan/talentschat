@@ -31,4 +31,5 @@ class Config:
     (UPLOAD_FOLDER / 'files').mkdir(exist_ok=True)
     (UPLOAD_FOLDER / 'videos').mkdir(exist_ok=True)
     (UPLOAD_FOLDER / 'avatars').mkdir(exist_ok=True)
+    (UPLOAD_FOLDER / 'profiles').mkdir(exist_ok=True)
 

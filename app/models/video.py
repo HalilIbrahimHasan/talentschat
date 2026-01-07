@@ -23,6 +23,12 @@ class Video(db.Model):
     uploader = db.relationship('User', back_populates='uploaded_videos')
     likes = db.relationship('VideoLike', back_populates='video', cascade='all, delete-orphan')
     comments = db.relationship('VideoComment', back_populates='video', cascade='all, delete-orphan', order_by='VideoComment.created_at')
+    stars = db.relationship('VideoStar', back_populates='video', cascade='all, delete-orphan')
+    
+    @property
+    def total_stars(self):
+        """Total stars for this video"""
+        return sum(star.stars for star in self.stars)
     
     def __repr__(self):
         return f'<Video {self.id}>'
@@ -61,4 +67,24 @@ class VideoComment(db.Model):
     
     def __repr__(self):
         return f'<VideoComment {self.id}>'
+
+
+class VideoStar(db.Model):
+    __tablename__ = 'video_stars'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    video_id = db.Column(db.Integer, db.ForeignKey('videos.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    stars = db.Column(db.Integer, default=1, nullable=False)  # 1-5 stars
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    video = db.relationship('Video', back_populates='stars')
+    user = db.relationship('User', back_populates='video_stars')
+    
+    __table_args__ = (db.UniqueConstraint('video_id', 'user_id', name='unique_video_star'),)
+    
+    def __repr__(self):
+        return f'<VideoStar {self.video_id} by {self.user_id}: {self.stars} stars>'
 

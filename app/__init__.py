@@ -35,6 +35,9 @@ def create_app(config_class=Config):
     from app.blueprints.articles import bp as articles_bp
     app.register_blueprint(articles_bp)
     
+    from app.blueprints.profile import bp as profile_bp
+    app.register_blueprint(profile_bp, url_prefix='/profile')
+    
     from app.blueprints.api import bp as api_bp
     # Exempt API routes from CSRF (they use JSON)
     csrf.exempt(api_bp)
@@ -118,6 +121,23 @@ def create_app(config_class=Config):
                     print("Added video_type column to videos")
             except Exception as ve:
                 print(f"Video migration note: {ve}")
+            
+            # Migrate users table to add profile fields
+            try:
+                result = conn.execute(text("PRAGMA table_info(users)"))
+                user_columns = [row[1] for row in result]
+                
+                if 'profile_image' not in user_columns:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN profile_image VARCHAR(255)"))
+                    conn.commit()
+                    print("Added profile_image column to users")
+                
+                if 'bio' not in user_columns:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN bio TEXT"))
+                    conn.commit()
+                    print("Added bio column to users")
+            except Exception as ue:
+                print(f"User migration note: {ue}")
             
             conn.close()
         except Exception as e:
