@@ -77,8 +77,7 @@ function initiateCall(userId, userName, type = 'video') {
         }, (response) => {
             if (response && response.call_id) {
                 currentCall.callId = response.call_id;
-                // Create peer connection with the callee and create offer
-                createPeerConnection(userId, true);
+                // Don't create peer connection yet - wait for callee to accept
                 updateCallUI();
             }
         });
@@ -132,8 +131,7 @@ function acceptCall() {
     
     // Get local media
     getLocalMedia(type).then(() => {
-        // Accept call - DON'T create peer connections here
-        // Wait for the caller to send the offer
+        // Accept call
         socket.emit('accept_call', {
             call_id: currentCall.callId
         });
@@ -142,6 +140,12 @@ function acceptCall() {
         updateCallModal('active', null, type);
         updateCallUI();
         stopRingtone();
+        
+        // Create peer connection with caller and create offer (callee initiates connection)
+        const caller = currentCall.participants.find(p => !p.isLocal && p.id !== CURRENT_USER_ID);
+        if (caller) {
+            createPeerConnection(caller.id, true);
+        }
     }).catch(err => {
         console.error('Error getting local media:', err);
         rejectCall();
@@ -185,6 +189,11 @@ function handleCallAccepted(data) {
             name: callee_name,
             isLocal: false
         });
+    }
+    
+    // Create peer connection with callee and send offer (caller side)
+    if (!peerConnections[callee_id]) {
+        createPeerConnection(callee_id, true);
     }
     
     updateCallModal('active', null, currentCallType);
@@ -285,7 +294,10 @@ function handleCallOffer(data) {
 function handleCallAnswer(data) {
     const { answer, from_user_id } = data;
     
-    if (!peerConnections[from_user_id]) return;
+    if (!peerConnections[from_user_id]) {
+        console.warn('Received answer but no peer connection for', from_user_id);
+        return;
+    }
     
     const pc = peerConnections[from_user_id];
     pc.setRemoteDescription(new RTCSessionDescription(answer))
@@ -389,9 +401,11 @@ function updatePeerConnectionsTracks() {
 function createPeerConnection(userId, isCaller) {
     // Don't create duplicate connections
     if (peerConnections[userId]) {
+        console.log('Peer connection already exists for', userId);
         return peerConnections[userId];
     }
     
+    console.log('Creating peer connection with', userId, 'isCaller:', isCaller);
     const pc = new RTCPeerConnection(STUN_SERVERS);
     peerConnections[userId] = pc;
     
@@ -399,8 +413,11 @@ function createPeerConnection(userId, isCaller) {
     const streamToUse = processedLocalStream || localStream;
     if (streamToUse) {
         streamToUse.getTracks().forEach(track => {
+            console.log('Adding local track:', track.kind, 'to peer connection with', userId);
             pc.addTrack(track, streamToUse);
         });
+    } else {
+        console.warn('No local stream available when creating peer connection');
     }
     
     // Add screen share stream if active
@@ -412,17 +429,20 @@ function createPeerConnection(userId, isCaller) {
     
     // Handle remote stream
     pc.ontrack = (event) => {
-        console.log('Received track from', userId, event);
-        const stream = event.streams[0];
-        remoteStreams[userId] = stream;
-        
-        // Update UI immediately
-        updateCallUI();
-        
-        // Also try to update video element if it exists
-        setTimeout(() => {
-            updateRemoteVideo(userId, stream);
-        }, 100);
+        console.log('✅ Received track from', userId, event);
+        const stream = event.streams[0] || event.stream;
+        if (stream) {
+            remoteStreams[userId] = stream;
+            console.log('Remote stream set for', userId, 'tracks:', stream.getTracks().length);
+            
+            // Update UI immediately
+            updateCallUI();
+            
+            // Also try to update video element if it exists
+            setTimeout(() => {
+                updateRemoteVideo(userId, stream);
+            }, 100);
+        }
     };
     
     // Handle ICE candidates
@@ -444,6 +464,11 @@ function createPeerConnection(userId, isCaller) {
         }
     };
     
+    // Handle ICE connection state
+    pc.oniceconnectionstatechange = () => {
+        console.log(`ICE connection state with ${userId}:`, pc.iceConnectionState);
+    };
+    
     // Create offer if caller
     if (isCaller) {
         pc.createOffer({
@@ -451,6 +476,7 @@ function createPeerConnection(userId, isCaller) {
             offerToReceiveVideo: currentCallType === 'video'
         })
             .then(offer => {
+                console.log('Created offer for', userId);
                 return pc.setLocalDescription(offer);
             })
             .then(() => {
@@ -459,6 +485,7 @@ function createPeerConnection(userId, isCaller) {
                     to_user_id: userId,
                     offer: pc.localDescription
                 });
+                console.log('Sent offer to', userId);
             })
             .catch(err => {
                 console.error('Error creating offer:', err);
@@ -655,7 +682,7 @@ function updateVideoGrid() {
     localVideoDiv.className = 'relative bg-black rounded-lg overflow-hidden';
     localVideoDiv.style.minHeight = '300px';
     localVideoDiv.innerHTML = `
-        <video id="localVideo" autoplay muted class="w-full h-full object-cover"></video>
+        <video id="localVideo" autoplay muted playsinline class="w-full h-full object-cover"></video>
         <div class="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-xs">You</div>
     `;
     videoGrid.appendChild(localVideoDiv);
@@ -711,26 +738,35 @@ function updateLocalVideo() {
     const localVideo = document.getElementById('localVideo');
     if (localVideo) {
         const streamToShow = isScreenSharing ? screenShareStream : (processedLocalStream || localStream);
-        localVideo.srcObject = streamToShow;
-        
-        // Apply blur effect if enabled (CSS-based, limited)
-        if (backgroundEffect === 'blur' && !isScreenSharing) {
-            localVideo.style.filter = 'blur(10px)';
-        } else {
-            localVideo.style.filter = '';
+        if (streamToShow) {
+            localVideo.srcObject = streamToShow;
+            
+            // Apply blur effect if enabled (CSS-based, limited)
+            if (backgroundEffect === 'blur' && !isScreenSharing) {
+                localVideo.style.filter = 'blur(10px)';
+            } else {
+                localVideo.style.filter = '';
+            }
         }
     }
 }
 
 function updateRemoteVideo(userId, stream) {
+    if (!stream) {
+        console.warn('No stream provided for', userId);
+        return;
+    }
+    
     const remoteVideo = document.getElementById(`remoteVideoStream-${userId}`);
-    if (remoteVideo && stream) {
+    if (remoteVideo) {
         remoteVideo.srcObject = stream;
         remoteVideo.onloadedmetadata = () => {
             remoteVideo.play().catch(err => {
                 console.error('Error playing remote video:', err);
             });
         };
+    } else {
+        console.warn('Remote video element not found for', userId);
     }
 }
 
