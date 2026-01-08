@@ -27,7 +27,14 @@ def create_app(config_class=Config):
     # Initialize extensions
     db.init_app(app)
     login_manager.init_app(app)
-    socketio.init_app(app, cors_allowed_origins="*")
+    # Configure SocketIO with better error handling for production
+    socketio.init_app(
+        app, 
+        cors_allowed_origins="*",
+        async_mode='eventlet',
+        ping_timeout=60,
+        ping_interval=25
+    )
     csrf.init_app(app)
     
     # Register blueprints
