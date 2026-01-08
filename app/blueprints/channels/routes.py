@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
 from app.blueprints.channels import bp
-from app.models.workspace import Workspace
+from app.models.workspace import Workspace, WorkspaceMember
 from app.models.channel import Channel, ChannelMember
 from app.extensions import db
 from app.services.permissions import can_view_workspace, can_view_channel, can_manage_channel
@@ -43,8 +43,9 @@ def view(workspace_slug, channel_slug):
     ).order_by(MessageHighlight.created_at.desc()).limit(10).all()
     highlighted_messages = [h.message for h in highlights]
     
-    # Get workspace members for adding to calls
-    members = workspace.members
+    # Get workspace members for adding to calls (extract User objects from WorkspaceMember)
+    memberships = WorkspaceMember.query.filter_by(workspace_id=workspace.id).all()
+    members = [m.user for m in memberships]
     
     return render_template(
         'channel/view.html',
