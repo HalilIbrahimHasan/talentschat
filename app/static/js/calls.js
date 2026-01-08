@@ -568,85 +568,66 @@ function startRecording() {
     recordingCanvas.height = 720;
     recordingContext = recordingCanvas.getContext('2d');
     
-    // Always create new video elements for recording (don't reuse existing ones)
-    // Videos need proper dimensions to render correctly
+    // Use existing video elements from DOM - they're already playing and rendering
     const videoElements = {};
-    const createdVideoElements = [];
     
-    // Create local video element
-    const localVideo = document.createElement('video');
-    const localStreamToUse = isScreenSharing ? screenShareStream : (processedLocalStream || localStream);
-    localVideo.srcObject = localStreamToUse;
-    localVideo.muted = true;
-    localVideo.autoplay = true;
-    localVideo.playsInline = true;
-    localVideo.width = 640;
-    localVideo.height = 480;
-    localVideo.style.position = 'fixed';
-    localVideo.style.top = '-9999px';
-    localVideo.style.left = '-9999px';
-    localVideo.style.width = '640px';
-    localVideo.style.height = '480px';
-    document.body.appendChild(localVideo);
-    videoElements.local = localVideo;
-    createdVideoElements.push(localVideo);
+    // Get existing local video element
+    const existingLocalVideo = document.getElementById('localVideo');
+    if (existingLocalVideo && existingLocalVideo.srcObject) {
+        videoElements.local = existingLocalVideo;
+    } else {
+        // Create new one if doesn't exist
+        const localVideo = document.createElement('video');
+        const localStreamToUse = isScreenSharing ? screenShareStream : (processedLocalStream || localStream);
+        localVideo.srcObject = localStreamToUse;
+        localVideo.muted = true;
+        localVideo.autoplay = true;
+        localVideo.playsInline = true;
+        localVideo.width = 640;
+        localVideo.height = 480;
+        localVideo.style.position = 'fixed';
+        localVideo.style.top = '0';
+        localVideo.style.left = '0';
+        localVideo.style.width = '640px';
+        localVideo.style.height = '480px';
+        localVideo.style.zIndex = '-1';
+        localVideo.style.opacity = '0';
+        document.body.appendChild(localVideo);
+        videoElements.local = localVideo;
+        localVideo.play().catch(console.error);
+    }
     
-    // Create remote video elements
+    // Get existing remote video elements
     Object.keys(remoteStreams).forEach(userId => {
-        const remoteVideo = document.createElement('video');
-        remoteVideo.srcObject = remoteStreams[userId];
-        remoteVideo.muted = false;
-        remoteVideo.autoplay = true;
-        remoteVideo.playsInline = true;
-        remoteVideo.width = 640;
-        remoteVideo.height = 480;
-        remoteVideo.style.position = 'fixed';
-        remoteVideo.style.top = '-9999px';
-        remoteVideo.style.left = '-9999px';
-        remoteVideo.style.width = '640px';
-        remoteVideo.style.height = '480px';
-        document.body.appendChild(remoteVideo);
-        videoElements[userId] = remoteVideo;
-        createdVideoElements.push(remoteVideo);
+        const existingRemoteVideo = document.getElementById(`remoteVideoStream-${userId}`);
+        if (existingRemoteVideo && existingRemoteVideo.srcObject) {
+            videoElements[userId] = existingRemoteVideo;
+        } else {
+            // Create new one if doesn't exist
+            const remoteVideo = document.createElement('video');
+            remoteVideo.srcObject = remoteStreams[userId];
+            remoteVideo.muted = false;
+            remoteVideo.autoplay = true;
+            remoteVideo.playsInline = true;
+            remoteVideo.width = 640;
+            remoteVideo.height = 480;
+            remoteVideo.style.position = 'fixed';
+            remoteVideo.style.top = '0';
+            remoteVideo.style.left = '0';
+            remoteVideo.style.width = '640px';
+            remoteVideo.style.height = '480px';
+            remoteVideo.style.zIndex = '-1';
+            remoteVideo.style.opacity = '0';
+            document.body.appendChild(remoteVideo);
+            videoElements[userId] = remoteVideo;
+            remoteVideo.play().catch(console.error);
+        }
     });
     
-    console.log('Created', Object.keys(videoElements).length, 'video elements for recording');
+    console.log('Using', Object.keys(videoElements).length, 'video elements for recording');
     
-    // Wait for all videos to be ready and playing
-    const videoPromises = Object.entries(videoElements).map(([key, video]) => {
-        return new Promise((resolve) => {
-            const checkReady = () => {
-                if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-                    console.log('Video ready:', key, video.videoWidth, 'x', video.videoHeight);
-                    resolve();
-                } else {
-                    setTimeout(checkReady, 50);
-                }
-            };
-            
-            video.addEventListener('loadedmetadata', () => {
-                video.play().then(() => {
-                    setTimeout(checkReady, 200);
-                }).catch(err => {
-                    console.warn('Error playing video:', key, err);
-                    setTimeout(checkReady, 200);
-                });
-            }, { once: true });
-            
-            // If already has metadata, try immediately
-            if (video.readyState >= 1) {
-                video.play().then(() => {
-                    setTimeout(checkReady, 200);
-                }).catch(() => {
-                    setTimeout(checkReady, 200);
-                });
-            }
-        });
-    });
-    
-    Promise.all(videoPromises).then(() => {
-        console.log('All videos ready, starting recording');
-        
+    // Wait a bit for videos to be ready, then start recording
+    setTimeout(() => {
         // Start drawing loop
         function drawFrame() {
             if (!isRecording) return;
@@ -661,7 +642,7 @@ function startRecording() {
             if (count === 1) {
                 // Single stream - full screen
                 const video = videoElements[streamKeys[0]];
-                if (video && video.readyState >= 2 && video.videoWidth > 0) {
+                if (video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
                     try {
                         recordingContext.drawImage(video, 0, 0, recordingCanvas.width, recordingCanvas.height);
                     } catch (e) {
@@ -672,14 +653,14 @@ function startRecording() {
                 // Two streams - side by side
                 const video1 = videoElements[streamKeys[0]];
                 const video2 = videoElements[streamKeys[1]];
-                if (video1 && video1.readyState >= 2 && video1.videoWidth > 0) {
+                if (video1 && video1.readyState >= 2 && video1.videoWidth > 0 && video1.videoHeight > 0) {
                     try {
                         recordingContext.drawImage(video1, 0, 0, recordingCanvas.width / 2, recordingCanvas.height);
                     } catch (e) {
                         console.warn('Error drawing video1:', e);
                     }
                 }
-                if (video2 && video2.readyState >= 2 && video2.videoWidth > 0) {
+                if (video2 && video2.readyState >= 2 && video2.videoWidth > 0 && video2.videoHeight > 0) {
                     try {
                         recordingContext.drawImage(video2, recordingCanvas.width / 2, 0, recordingCanvas.width / 2, recordingCanvas.height);
                     } catch (e) {
@@ -695,7 +676,7 @@ function startRecording() {
                 
                 streamKeys.forEach((key, index) => {
                     const video = videoElements[key];
-                    if (video && video.readyState >= 2 && video.videoWidth > 0) {
+                    if (video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
                         try {
                             const col = index % cols;
                             const row = Math.floor(index / cols);
@@ -710,17 +691,17 @@ function startRecording() {
             recordingAnimationFrame = requestAnimationFrame(drawFrame);
         }
         
-        // Start drawing loop first
+        // Start drawing loop
         drawFrame();
         
-        // Get combined audio tracks
+        // Get audio tracks from local stream
         const streamToUse = isScreenSharing ? screenShareStream : (processedLocalStream || localStream);
         
         // Create canvas stream
         const combinedStream = recordingCanvas.captureStream(30);
         
-        // Add audio tracks (just local for now - mixing multiple audio requires AudioContext)
-        if (streamToUse) {
+        // Add audio track from local stream
+        if (streamToUse && streamToUse.getAudioTracks().length > 0) {
             streamToUse.getAudioTracks().forEach(track => {
                 combinedStream.addTrack(track);
             });
@@ -754,10 +735,13 @@ function startRecording() {
                 cancelAnimationFrame(recordingAnimationFrame);
             }
             
-            // Clean up video elements we created
-            createdVideoElements.forEach(video => {
-                video.srcObject = null;
-                video.remove();
+            // Clean up only videos we created (not DOM elements)
+            Object.entries(videoElements).forEach(([key, video]) => {
+                // Only remove if we created it (has our special styling)
+                if (video.style.zIndex === '-1' && video.style.opacity === '0') {
+                    video.srcObject = null;
+                    video.remove();
+                }
             });
             
             const blob = new Blob(recordedChunks, { type: 'video/webm' });
@@ -769,14 +753,7 @@ function startRecording() {
         isRecording = true;
         updateRecordButton(true);
         console.log('Recording started');
-    }).catch(err => {
-        console.error('Error preparing recording:', err);
-        alert('Error starting recording: ' + err.message);
-        // Clean up
-        createdVideoElements.forEach(video => video.remove());
-        recordingCanvas = null;
-        recordingContext = null;
-    });
+    }, 500); // Give videos time to render
 }
 
 function stopRecording() {
@@ -1251,10 +1228,17 @@ function updateScreenShareButton(isSharing) {
     }
 }
 
-function updateRecordButton(isRecording) {
+function updateRecordButton(isRecordingState) {
     const recordBtn = document.getElementById('recordBtn');
     if (recordBtn) {
-        recordBtn.classList.toggle('bg-red-500', isRecording);
-        recordBtn.classList.toggle('bg-gray-500', !isRecording);
+        if (isRecordingState) {
+            recordBtn.classList.remove('bg-gray-500', 'hover:bg-gray-600');
+            recordBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+            recordBtn.title = 'Stop Recording';
+        } else {
+            recordBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
+            recordBtn.classList.add('bg-gray-500', 'hover:bg-gray-600');
+            recordBtn.title = 'Record Call';
+        }
     }
 }
