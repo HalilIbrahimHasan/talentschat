@@ -15,6 +15,11 @@ let backgroundImage = null;
 let backgroundCanvas = null;
 let backgroundContext = null;
 let backgroundVideo = null;
+let recordingCanvas = null;
+let recordingContext = null;
+let recordingAnimationFrame = null;
+let isCallModalMinimized = false;
+let remoteAudioElements = {}; // {userId: HTMLAudioElement}
 
 const STUN_SERVERS = {
     iceServers: [
@@ -555,29 +560,150 @@ function stopScreenShare() {
 function startRecording() {
     if (!localStream || isRecording) return;
     
-    const allStreams = [localStream, ...Object.values(remoteStreams)];
-    const streamToRecord = localStream;
+    // Create canvas for compositing all streams
+    recordingCanvas = document.createElement('canvas');
+    recordingCanvas.width = 1280;
+    recordingCanvas.height = 720;
+    recordingContext = recordingCanvas.getContext('2d');
     
-    recordedChunks = [];
-    mediaRecorder = new MediaRecorder(streamToRecord, {
-        mimeType: 'video/webm;codecs=vp9,opus'
+    // Create video elements for all streams
+    const videoElements = {};
+    
+    // Local video
+    const localVideo = document.createElement('video');
+    localVideo.srcObject = isScreenSharing ? screenShareStream : (processedLocalStream || localStream);
+    localVideo.muted = true;
+    localVideo.autoplay = true;
+    localVideo.playsInline = true;
+    videoElements.local = localVideo;
+    
+    // Remote videos
+    Object.keys(remoteStreams).forEach(userId => {
+        const remoteVideo = document.createElement('video');
+        remoteVideo.srcObject = remoteStreams[userId];
+        remoteVideo.muted = false;
+        remoteVideo.autoplay = true;
+        remoteVideo.playsInline = true;
+        videoElements[userId] = remoteVideo;
     });
     
-    mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-            recordedChunks.push(event.data);
+    // Wait for all videos to be ready
+    const videoPromises = Object.values(videoElements).map(video => {
+        return new Promise((resolve) => {
+            video.onloadedmetadata = () => {
+                video.play().then(resolve).catch(resolve);
+            };
+        });
+    });
+    
+    Promise.all(videoPromises).then(() => {
+        // Start drawing loop
+        function drawFrame() {
+            if (!isRecording) return;
+            
+            // Clear canvas
+            recordingContext.fillStyle = '#000';
+            recordingContext.fillRect(0, 0, recordingCanvas.width, recordingCanvas.height);
+            
+            const streamKeys = Object.keys(videoElements);
+            const count = streamKeys.length;
+            
+            if (count === 1) {
+                // Single stream - full screen
+                const video = videoElements[streamKeys[0]];
+                if (video && video.readyState >= 2) {
+                    recordingContext.drawImage(video, 0, 0, recordingCanvas.width, recordingCanvas.height);
+                }
+            } else if (count === 2) {
+                // Two streams - side by side
+                const video1 = videoElements[streamKeys[0]];
+                const video2 = videoElements[streamKeys[1]];
+                if (video1 && video1.readyState >= 2) {
+                    recordingContext.drawImage(video1, 0, 0, recordingCanvas.width / 2, recordingCanvas.height);
+                }
+                if (video2 && video2.readyState >= 2) {
+                    recordingContext.drawImage(video2, recordingCanvas.width / 2, 0, recordingCanvas.width / 2, recordingCanvas.height);
+                }
+            } else {
+                // Multiple streams - grid layout
+                const cols = Math.ceil(Math.sqrt(count));
+                const rows = Math.ceil(count / cols);
+                const cellWidth = recordingCanvas.width / cols;
+                const cellHeight = recordingCanvas.height / rows;
+                
+                streamKeys.forEach((key, index) => {
+                    const video = videoElements[key];
+                    if (video && video.readyState >= 2) {
+                        const col = index % cols;
+                        const row = Math.floor(index / cols);
+                        recordingContext.drawImage(video, col * cellWidth, row * cellHeight, cellWidth, cellHeight);
+                    }
+                });
+            }
+            
+            recordingAnimationFrame = requestAnimationFrame(drawFrame);
         }
-    };
-    
-    mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        downloadRecording(url);
-    };
-    
-    mediaRecorder.start();
-    isRecording = true;
-    updateRecordButton(true);
+        
+        // Start drawing
+        drawFrame();
+        
+        // Get combined audio tracks
+        const audioTracks = [];
+        const streamToUse = isScreenSharing ? screenShareStream : (processedLocalStream || localStream);
+        streamToUse.getAudioTracks().forEach(track => audioTracks.push(track));
+        Object.values(remoteStreams).forEach(stream => {
+            stream.getAudioTracks().forEach(track => audioTracks.push(track));
+        });
+        
+        // Create combined audio context (simplified - just use local audio for now)
+        // Note: Combining multiple audio streams requires AudioContext and mixing
+        // For simplicity, we'll use the local stream's audio
+        const combinedStream = recordingCanvas.captureStream(30);
+        streamToUse.getAudioTracks().forEach(track => {
+            combinedStream.addTrack(track);
+        });
+        
+        // Start recording
+        recordedChunks = [];
+        const options = {
+            mimeType: 'video/webm;codecs=vp9,opus',
+            videoBitsPerSecond: 2500000
+        };
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options.mimeType = 'video/webm;codecs=vp8,opus';
+        }
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options.mimeType = 'video/webm';
+        }
+        
+        mediaRecorder = new MediaRecorder(combinedStream, options);
+        
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                recordedChunks.push(event.data);
+            }
+        };
+        
+        mediaRecorder.onstop = () => {
+            // Stop drawing
+            if (recordingAnimationFrame) {
+                cancelAnimationFrame(recordingAnimationFrame);
+            }
+            
+            // Clean up video elements
+            Object.values(videoElements).forEach(video => {
+                video.srcObject = null;
+            });
+            
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            downloadRecording(url);
+        };
+        
+        mediaRecorder.start(1000);
+        isRecording = true;
+        updateRecordButton(true);
+    });
 }
 
 function stopRecording() {
@@ -586,6 +712,15 @@ function stopRecording() {
     mediaRecorder.stop();
     isRecording = false;
     updateRecordButton(false);
+    
+    // Stop drawing loop
+    if (recordingAnimationFrame) {
+        cancelAnimationFrame(recordingAnimationFrame);
+        recordingAnimationFrame = null;
+    }
+    
+    recordingCanvas = null;
+    recordingContext = null;
 }
 
 function downloadRecording(url) {
@@ -608,6 +743,16 @@ function cleanupCall() {
     if (isScreenSharing) {
         stopScreenShare();
     }
+    
+    // Clean up audio elements
+    Object.values(remoteAudioElements).forEach(audio => {
+        audio.srcObject = null;
+        audio.remove();
+    });
+    remoteAudioElements = {};
+    
+    // Reset minimized state
+    isCallModalMinimized = false;
     
     // Stop local stream
     if (localStream) {
@@ -729,6 +874,35 @@ function updateAudioCallUI() {
         </div>
     `;
     videoGrid.className = 'grid grid-cols-1 gap-4';
+    
+    // Create/update audio elements for remote streams
+    Object.keys(remoteStreams).forEach(userId => {
+        if (!remoteAudioElements[userId]) {
+            const audio = document.createElement('audio');
+            audio.autoplay = true;
+            audio.playsInline = true;
+            audio.id = `remoteAudio-${userId}`;
+            audio.style.display = 'none';
+            document.body.appendChild(audio);
+            remoteAudioElements[userId] = audio;
+        }
+        
+        const audio = remoteAudioElements[userId];
+        audio.srcObject = remoteStreams[userId];
+        audio.play().catch(err => {
+            console.error('Error playing remote audio:', err);
+        });
+    });
+    
+    // Remove audio elements for users who left
+    Object.keys(remoteAudioElements).forEach(userId => {
+        if (!remoteStreams[userId]) {
+            const audio = remoteAudioElements[userId];
+            audio.srcObject = null;
+            audio.remove();
+            delete remoteAudioElements[userId];
+        }
+    });
 }
 
 function updateLocalVideo() {
@@ -754,6 +928,7 @@ function updateRemoteVideo(userId, stream) {
         return;
     }
     
+    // Handle video streams
     const remoteVideo = document.getElementById(`remoteVideoStream-${userId}`);
     if (remoteVideo) {
         remoteVideo.srcObject = stream;
@@ -762,8 +937,25 @@ function updateRemoteVideo(userId, stream) {
                 console.error('Error playing remote video:', err);
             });
         };
-    } else {
-        console.warn('Remote video element not found for', userId);
+    }
+    
+    // Handle audio streams for audio-only calls
+    if (currentCallType === 'audio') {
+        if (!remoteAudioElements[userId]) {
+            const audio = document.createElement('audio');
+            audio.autoplay = true;
+            audio.playsInline = true;
+            audio.id = `remoteAudio-${userId}`;
+            audio.style.display = 'none';
+            document.body.appendChild(audio);
+            remoteAudioElements[userId] = audio;
+        }
+        
+        const audio = remoteAudioElements[userId];
+        audio.srcObject = stream;
+        audio.play().catch(err => {
+            console.error('Error playing remote audio:', err);
+        });
     }
 }
 
@@ -834,6 +1026,45 @@ function hideCallModal() {
     if (modal) {
         modal.classList.add('hidden');
     }
+}
+
+function toggleCallModalMinimize() {
+    const modal = document.getElementById('callModal');
+    const content = document.getElementById('callModalContent');
+    const icon = document.getElementById('minimizeIcon');
+    
+    if (!modal || !content) return;
+    
+    isCallModalMinimized = !isCallModalMinimized;
+    
+    if (isCallModalMinimized) {
+        // Minimize - make it a small floating window
+        modal.classList.remove('items-center', 'justify-center');
+        modal.style.alignItems = 'flex-end';
+        modal.style.justifyContent = 'flex-end';
+        modal.style.padding = '20px';
+        content.style.maxWidth = '400px';
+        content.style.width = 'auto';
+        content.style.height = 'auto';
+        content.style.maxHeight = '300px';
+        content.style.overflow = 'auto';
+        if (icon) icon.className = 'fas fa-window-restore text-lg';
+    } else {
+        // Maximize - restore to full size
+        modal.classList.add('items-center', 'justify-center');
+        modal.style.alignItems = '';
+        modal.style.justifyContent = '';
+        modal.style.padding = '';
+        content.style.maxWidth = 'max-w-7xl';
+        content.style.width = 'w-full';
+        content.style.height = '';
+        content.style.maxHeight = '';
+        content.style.overflow = '';
+        if (icon) icon.className = 'fas fa-window-minimize text-lg';
+    }
+    
+    // Update UI to reflect changes
+    updateCallUI();
 }
 
 function playRingtone() {
