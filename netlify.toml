@@ -1,0 +1,18 @@
+# ⚠️ WARNING: NETLIFY IS NOT SUITABLE FOR FLASK APPLICATIONS
+# This file exists only to prevent Netlify from trying to auto-build
+# Please use Render.com, Railway.app, or another Python hosting platform
+# See DEPLOYMENT.md for proper deployment instructions
+
+[build]
+  # This will fail intentionally - Flask apps need persistent servers
+  command = "echo 'ERROR: Netlify is not suitable for Flask applications. Please use Render.com, Railway.app, or another Python hosting platform. See DEPLOYMENT.md' && exit 1"
+  publish = "."
+
+# Even if you get past the build, your Flask app won't work on Netlify because:
+# 1. WebSockets don't work properly on Netlify Functions
+# 2. Functions timeout after 10-26 seconds
+# 3. No persistent file system for uploads
+# 4. Real-time features will fail
+# 
+# Use Render.com instead - it's free and designed for Flask apps!
+
