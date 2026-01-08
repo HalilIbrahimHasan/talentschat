@@ -2,6 +2,7 @@
 let currentCall = null;
 let localStream = null;
 let screenShareStream = null;
+let processedLocalStream = null; // Stream with background effects
 let peerConnections = {}; // {userId: RTCPeerConnection}
 let remoteStreams = {}; // {userId: MediaStream}
 let currentCallType = null; // 'video' or 'audio'
@@ -9,6 +10,11 @@ let mediaRecorder = null;
 let recordedChunks = [];
 let isRecording = false;
 let isScreenSharing = false;
+let backgroundEffect = 'none'; // 'none', 'blur', 'image'
+let backgroundImage = null;
+let backgroundCanvas = null;
+let backgroundContext = null;
+let backgroundVideo = null;
 
 const STUN_SERVERS = {
     iceServers: [
@@ -71,6 +77,8 @@ function initiateCall(userId, userName, type = 'video') {
         }, (response) => {
             if (response && response.call_id) {
                 currentCall.callId = response.call_id;
+                // Create peer connection with the callee and create offer
+                createPeerConnection(userId, true);
                 updateCallUI();
             }
         });
@@ -108,6 +116,7 @@ function handleIncomingCall(data) {
         type: type,
         isGroup: (participants && participants.length > 2) || false
     };
+    currentCallType = type;
     
     // Show incoming call UI
     showCallModal('incoming', caller_name, type);
@@ -123,14 +132,8 @@ function acceptCall() {
     
     // Get local media
     getLocalMedia(type).then(() => {
-        // Create peer connections for all existing participants
-        currentCall.participants.forEach(participant => {
-            if (!participant.isLocal && participant.id !== CURRENT_USER_ID) {
-                createPeerConnection(participant.id, true);
-            }
-        });
-        
-        // Accept call
+        // Accept call - DON'T create peer connections here
+        // Wait for the caller to send the offer
         socket.emit('accept_call', {
             call_id: currentCall.callId
         });
@@ -175,9 +178,13 @@ function handleCallAccepted(data) {
     
     const { call_id, callee_id, callee_name } = data;
     
-    // Create peer connection with the new participant
-    if (!peerConnections[callee_id]) {
-        createPeerConnection(callee_id, true);
+    // Add participant to call
+    if (!currentCall.participants.find(p => p.id === callee_id)) {
+        currentCall.participants.push({
+            id: callee_id,
+            name: callee_name,
+            isLocal: false
+        });
     }
     
     updateCallModal('active', null, currentCallType);
@@ -207,7 +214,7 @@ function handleParticipantJoined(data) {
         });
         currentCall.isGroup = currentCall.participants.length > 2;
         
-        // Create peer connection
+        // Create peer connection and send offer to new participant
         if (!peerConnections[user_id]) {
             createPeerConnection(user_id, true);
         }
@@ -248,22 +255,26 @@ function handleCallOffer(data) {
     
     const { offer, from_user_id } = data;
     
+    // Create peer connection if it doesn't exist
     if (!peerConnections[from_user_id]) {
         createPeerConnection(from_user_id, false);
     }
     
-    peerConnections[from_user_id].setRemoteDescription(new RTCSessionDescription(offer))
+    const pc = peerConnections[from_user_id];
+    
+    // Set remote description and create answer
+    pc.setRemoteDescription(new RTCSessionDescription(offer))
         .then(() => {
-            return peerConnections[from_user_id].createAnswer();
+            return pc.createAnswer();
         })
         .then(answer => {
-            return peerConnections[from_user_id].setLocalDescription(answer);
+            return pc.setLocalDescription(answer);
         })
         .then(() => {
             socket.emit('call_answer', {
                 call_id: currentCall.callId,
                 to_user_id: from_user_id,
-                answer: peerConnections[from_user_id].localDescription
+                answer: pc.localDescription
             });
         })
         .catch(err => {
@@ -276,7 +287,8 @@ function handleCallAnswer(data) {
     
     if (!peerConnections[from_user_id]) return;
     
-    peerConnections[from_user_id].setRemoteDescription(new RTCSessionDescription(answer))
+    const pc = peerConnections[from_user_id];
+    pc.setRemoteDescription(new RTCSessionDescription(answer))
         .catch(err => {
             console.error('Error setting remote description:', err);
         });
@@ -287,8 +299,9 @@ function handleIceCandidate(data) {
     
     if (!peerConnections[from_user_id]) return;
     
+    const pc = peerConnections[from_user_id];
     if (candidate) {
-        peerConnections[from_user_id].addIceCandidate(new RTCIceCandidate(candidate))
+        pc.addIceCandidate(new RTCIceCandidate(candidate))
             .catch(err => {
                 console.error('Error adding ICE candidate:', err);
             });
@@ -300,7 +313,7 @@ function handleCallError(data) {
     alert(data.message || 'Call error occurred');
 }
 
-function getLocalMedia(type) {
+async function getLocalMedia(type) {
     const constraints = {
         audio: true,
         video: type === 'video' ? {
@@ -309,22 +322,84 @@ function getLocalMedia(type) {
         } : false
     };
     
-    return navigator.mediaDevices.getUserMedia(constraints)
-        .then(stream => {
-            localStream = stream;
-            updateLocalVideo();
-            return stream;
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        localStream = stream;
+        
+        // Process stream for background effects if video
+        if (type === 'video') {
+            await processLocalStream();
+        } else {
+            processedLocalStream = stream;
+        }
+        
+        updateLocalVideo();
+        return stream;
+    } catch (err) {
+        console.error('Error getting local media:', err);
+        throw err;
+    }
+}
+
+async function processLocalStream() {
+    if (!localStream) return;
+    
+    if (backgroundEffect === 'none') {
+        processedLocalStream = localStream;
+        updateLocalVideo();
+        updatePeerConnectionsTracks();
+        return;
+    }
+    
+    // For blur or background image, we'll use a simplified approach
+    // Note: Full background removal requires ML models or external libraries
+    // This is a placeholder that can be enhanced with libraries like BodyPix or MediaPipe
+    
+    if (backgroundEffect === 'blur') {
+        // Use CSS filter for blur (simplified approach)
+        // For real-time video blur, you'd need Canvas + filter or a WebGL shader
+        processedLocalStream = localStream;
+    } else if (backgroundEffect === 'image') {
+        // Virtual background with image
+        processedLocalStream = localStream;
+    }
+    
+    updateLocalVideo();
+    updatePeerConnectionsTracks();
+}
+
+function updatePeerConnectionsTracks() {
+    if (!processedLocalStream) return;
+    
+    Object.keys(peerConnections).forEach(userId => {
+        const pc = peerConnections[userId];
+        processedLocalStream.getTracks().forEach(track => {
+            const sender = pc.getSenders().find(s => 
+                s.track && s.track.kind === track.kind
+            );
+            if (sender) {
+                sender.replaceTrack(track);
+            } else {
+                pc.addTrack(track, processedLocalStream);
+            }
         });
+    });
 }
 
 function createPeerConnection(userId, isCaller) {
+    // Don't create duplicate connections
+    if (peerConnections[userId]) {
+        return peerConnections[userId];
+    }
+    
     const pc = new RTCPeerConnection(STUN_SERVERS);
     peerConnections[userId] = pc;
     
     // Add local stream tracks
-    if (localStream) {
-        localStream.getTracks().forEach(track => {
-            pc.addTrack(track, localStream);
+    const streamToUse = processedLocalStream || localStream;
+    if (streamToUse) {
+        streamToUse.getTracks().forEach(track => {
+            pc.addTrack(track, streamToUse);
         });
     }
     
@@ -337,8 +412,17 @@ function createPeerConnection(userId, isCaller) {
     
     // Handle remote stream
     pc.ontrack = (event) => {
-        remoteStreams[userId] = event.streams[0];
-        updateRemoteVideo(userId, event.streams[0]);
+        console.log('Received track from', userId, event);
+        const stream = event.streams[0];
+        remoteStreams[userId] = stream;
+        
+        // Update UI immediately
+        updateCallUI();
+        
+        // Also try to update video element if it exists
+        setTimeout(() => {
+            updateRemoteVideo(userId, stream);
+        }, 100);
     };
     
     // Handle ICE candidates
@@ -356,13 +440,16 @@ function createPeerConnection(userId, isCaller) {
     pc.onconnectionstatechange = () => {
         console.log(`Connection state with ${userId}:`, pc.connectionState);
         if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-            // Participant might have left
+            console.warn(`Connection with ${userId} failed or disconnected`);
         }
     };
     
     // Create offer if caller
     if (isCaller) {
-        pc.createOffer()
+        pc.createOffer({
+            offerToReceiveAudio: true,
+            offerToReceiveVideo: currentCallType === 'video'
+        })
             .then(offer => {
                 return pc.setLocalDescription(offer);
             })
@@ -423,17 +510,18 @@ function stopScreenShare() {
     isScreenSharing = false;
     
     // Switch back to camera
-    if (localStream) {
-        Object.keys(peerConnections).forEach(userId => {
-            const pc = peerConnections[userId];
-            const videoTrack = localStream.getVideoTracks()[0];
-            if (videoTrack) {
+    const streamToUse = processedLocalStream || localStream;
+    if (streamToUse) {
+        const videoTrack = streamToUse.getVideoTracks()[0];
+        if (videoTrack) {
+            Object.keys(peerConnections).forEach(userId => {
+                const pc = peerConnections[userId];
                 const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
                 if (sender) {
                     sender.replaceTrack(videoTrack);
                 }
-            }
-        });
+            });
+        }
     }
     
     updateScreenShareButton(false);
@@ -444,7 +532,6 @@ function startRecording() {
     if (!localStream || isRecording) return;
     
     const allStreams = [localStream, ...Object.values(remoteStreams)];
-    // For simplicity, record local stream only (can be enhanced to mix all streams)
     const streamToRecord = localStream;
     
     recordedChunks = [];
@@ -504,6 +591,18 @@ function cleanupCall() {
         localStream = null;
     }
     
+    if (processedLocalStream && processedLocalStream !== localStream) {
+        processedLocalStream.getTracks().forEach(track => track.stop());
+        processedLocalStream = null;
+    }
+    
+    // Cleanup background canvas
+    if (backgroundCanvas) {
+        backgroundCanvas = null;
+        backgroundContext = null;
+        backgroundVideo = null;
+    }
+    
     // Close all peer connections
     Object.values(peerConnections).forEach(pc => pc.close());
     peerConnections = {};
@@ -514,6 +613,8 @@ function cleanupCall() {
     // Clear call state
     currentCall = null;
     currentCallType = null;
+    backgroundEffect = 'none';
+    backgroundImage = null;
     
     // Hide modal
     hideCallModal();
@@ -535,8 +636,12 @@ function updateCallUI() {
         });
     }
     
-    // Update video grid
-    updateVideoGrid();
+    // Update video/audio grid
+    if (currentCall.type === 'video') {
+        updateVideoGrid();
+    } else {
+        updateAudioCallUI();
+    }
 }
 
 function updateVideoGrid() {
@@ -548,6 +653,7 @@ function updateVideoGrid() {
     // Add local video
     const localVideoDiv = document.createElement('div');
     localVideoDiv.className = 'relative bg-black rounded-lg overflow-hidden';
+    localVideoDiv.style.minHeight = '300px';
     localVideoDiv.innerHTML = `
         <video id="localVideo" autoplay muted class="w-full h-full object-cover"></video>
         <div class="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-xs">You</div>
@@ -562,8 +668,9 @@ function updateVideoGrid() {
             const remoteVideoDiv = document.createElement('div');
             remoteVideoDiv.className = 'relative bg-black rounded-lg overflow-hidden';
             remoteVideoDiv.id = `remoteVideo-${userId}`;
+            remoteVideoDiv.style.minHeight = '300px';
             remoteVideoDiv.innerHTML = `
-                <video id="remoteVideoStream-${userId}" autoplay class="w-full h-full object-cover"></video>
+                <video id="remoteVideoStream-${userId}" autoplay playsinline class="w-full h-full object-cover"></video>
                 <div class="absolute bottom-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-xs">${participant.name}</div>
             `;
             videoGrid.appendChild(remoteVideoDiv);
@@ -582,17 +689,48 @@ function updateVideoGrid() {
     }
 }
 
+function updateAudioCallUI() {
+    const videoGrid = document.getElementById('videoGrid');
+    if (!videoGrid) return;
+    
+    videoGrid.innerHTML = `
+        <div class="col-span-2 flex flex-col items-center justify-center space-y-4 py-8">
+            <div class="w-32 h-32 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-4xl font-bold">
+                ${currentCall.participants.find(p => !p.isLocal)?.name?.[0] || '?'}
+            </div>
+            <div class="text-white text-xl font-semibold">
+                ${currentCall.participants.find(p => !p.isLocal)?.name || 'Participant'}
+            </div>
+            <div class="text-white/70 text-sm">Audio Call</div>
+        </div>
+    `;
+    videoGrid.className = 'grid grid-cols-1 gap-4';
+}
+
 function updateLocalVideo() {
     const localVideo = document.getElementById('localVideo');
     if (localVideo) {
-        localVideo.srcObject = isScreenSharing ? screenShareStream : localStream;
+        const streamToShow = isScreenSharing ? screenShareStream : (processedLocalStream || localStream);
+        localVideo.srcObject = streamToShow;
+        
+        // Apply blur effect if enabled (CSS-based, limited)
+        if (backgroundEffect === 'blur' && !isScreenSharing) {
+            localVideo.style.filter = 'blur(10px)';
+        } else {
+            localVideo.style.filter = '';
+        }
     }
 }
 
 function updateRemoteVideo(userId, stream) {
     const remoteVideo = document.getElementById(`remoteVideoStream-${userId}`);
-    if (remoteVideo) {
+    if (remoteVideo && stream) {
         remoteVideo.srcObject = stream;
+        remoteVideo.onloadedmetadata = () => {
+            remoteVideo.play().catch(err => {
+                console.error('Error playing remote video:', err);
+            });
+        };
     }
 }
 
@@ -629,19 +767,32 @@ function updateCallButtons(state) {
     const acceptBtn = document.getElementById('acceptCallBtn');
     const rejectBtn = document.getElementById('rejectCallBtn');
     const endCallBtn = document.getElementById('endCallBtn');
+    const blurBtn = document.getElementById('blurBackgroundBtn');
+    const videoBtn = document.getElementById('videoBtn');
+    const screenShareBtn = document.getElementById('screenShareBtn');
     
     if (state === 'incoming') {
         if (acceptBtn) acceptBtn.classList.remove('hidden');
         if (rejectBtn) rejectBtn.classList.remove('hidden');
         if (endCallBtn) endCallBtn.classList.add('hidden');
+        if (blurBtn) blurBtn.style.display = 'none';
+        if (videoBtn) videoBtn.style.display = 'none';
+        if (screenShareBtn) screenShareBtn.style.display = 'none';
     } else if (state === 'outgoing') {
         if (acceptBtn) acceptBtn.classList.add('hidden');
         if (rejectBtn) rejectBtn.classList.remove('hidden');
         if (endCallBtn) endCallBtn.classList.add('hidden');
+        if (blurBtn) blurBtn.style.display = 'none';
+        if (videoBtn) videoBtn.style.display = 'none';
+        if (screenShareBtn) screenShareBtn.style.display = 'none';
     } else if (state === 'active') {
         if (acceptBtn) acceptBtn.classList.add('hidden');
         if (rejectBtn) rejectBtn.classList.add('hidden');
         if (endCallBtn) endCallBtn.classList.remove('hidden');
+        // Show blur button only for video calls
+        if (blurBtn) blurBtn.style.display = currentCallType === 'video' ? 'flex' : 'none';
+        if (videoBtn) videoBtn.style.display = currentCallType === 'video' ? 'flex' : 'none';
+        if (screenShareBtn) screenShareBtn.style.display = currentCallType === 'video' ? 'flex' : 'none';
     }
 }
 
@@ -669,7 +820,7 @@ function toggleMute() {
         
         const muteBtn = document.getElementById('muteBtn');
         if (muteBtn) {
-            muteBtn.classList.toggle('bg-red-500', !audioTracks[0].enabled);
+            muteBtn.classList.toggle('bg-red-500', !audioTracks[0]?.enabled);
         }
     }
 }
@@ -683,9 +834,39 @@ function toggleVideo() {
         
         const videoBtn = document.getElementById('videoBtn');
         if (videoBtn) {
-            videoBtn.classList.toggle('bg-red-500', !videoTracks[0].enabled);
+            videoBtn.classList.toggle('bg-red-500', !videoTracks[0]?.enabled);
         }
     }
+}
+
+function toggleBackgroundBlur() {
+    if (currentCallType !== 'video') return;
+    
+    if (backgroundEffect === 'blur') {
+        backgroundEffect = 'none';
+    } else {
+        backgroundEffect = 'blur';
+    }
+    
+    processLocalStream();
+    
+    const blurBtn = document.getElementById('blurBackgroundBtn');
+    if (blurBtn) {
+        blurBtn.classList.toggle('bg-green-500', backgroundEffect === 'blur');
+        blurBtn.classList.toggle('bg-white/20', backgroundEffect !== 'blur');
+    }
+}
+
+function setBackgroundImage(file) {
+    if (currentCallType !== 'video') return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        backgroundImage = e.target.result;
+        backgroundEffect = 'image';
+        processLocalStream();
+    };
+    reader.readAsDataURL(file);
 }
 
 function updateScreenShareButton(isSharing) {
