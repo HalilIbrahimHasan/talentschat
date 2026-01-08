@@ -560,213 +560,220 @@ function stopScreenShare() {
 function startRecording() {
     if (!localStream || isRecording) return;
     
+    console.log('Starting recording...');
+    
     // Create canvas for compositing all streams
     recordingCanvas = document.createElement('canvas');
     recordingCanvas.width = 1280;
     recordingCanvas.height = 720;
     recordingContext = recordingCanvas.getContext('2d');
     
-    // Use existing video elements from DOM, or create new ones
+    // Always create new video elements for recording (don't reuse existing ones)
+    // Videos need proper dimensions to render correctly
     const videoElements = {};
+    const createdVideoElements = [];
     
-    // Try to use existing local video element
-    const existingLocalVideo = document.getElementById('localVideo');
-    if (existingLocalVideo && existingLocalVideo.srcObject) {
-        videoElements.local = existingLocalVideo;
-    } else {
-        // Create new local video element
-        const localVideo = document.createElement('video');
-        localVideo.srcObject = isScreenSharing ? screenShareStream : (processedLocalStream || localStream);
-        localVideo.muted = true;
-        localVideo.autoplay = true;
-        localVideo.playsInline = true;
-        localVideo.style.position = 'absolute';
-        localVideo.style.width = '1px';
-        localVideo.style.height = '1px';
-        localVideo.style.opacity = '0';
-        localVideo.style.pointerEvents = 'none';
-        document.body.appendChild(localVideo);
-        videoElements.local = localVideo;
-    }
+    // Create local video element
+    const localVideo = document.createElement('video');
+    const localStreamToUse = isScreenSharing ? screenShareStream : (processedLocalStream || localStream);
+    localVideo.srcObject = localStreamToUse;
+    localVideo.muted = true;
+    localVideo.autoplay = true;
+    localVideo.playsInline = true;
+    localVideo.width = 640;
+    localVideo.height = 480;
+    localVideo.style.position = 'fixed';
+    localVideo.style.top = '-9999px';
+    localVideo.style.left = '-9999px';
+    localVideo.style.width = '640px';
+    localVideo.style.height = '480px';
+    document.body.appendChild(localVideo);
+    videoElements.local = localVideo;
+    createdVideoElements.push(localVideo);
     
-    // Get or create remote video elements
+    // Create remote video elements
     Object.keys(remoteStreams).forEach(userId => {
-        const existingRemoteVideo = document.getElementById(`remoteVideoStream-${userId}`);
-        if (existingRemoteVideo && existingRemoteVideo.srcObject) {
-            videoElements[userId] = existingRemoteVideo;
-        } else {
-            // Create new remote video element
-            const remoteVideo = document.createElement('video');
-            remoteVideo.srcObject = remoteStreams[userId];
-            remoteVideo.muted = false;
-            remoteVideo.autoplay = true;
-            remoteVideo.playsInline = true;
-            remoteVideo.style.position = 'absolute';
-            remoteVideo.style.width = '1px';
-            remoteVideo.style.height = '1px';
-            remoteVideo.style.opacity = '0';
-            remoteVideo.style.pointerEvents = 'none';
-            document.body.appendChild(remoteVideo);
-            videoElements[userId] = remoteVideo;
-        }
+        const remoteVideo = document.createElement('video');
+        remoteVideo.srcObject = remoteStreams[userId];
+        remoteVideo.muted = false;
+        remoteVideo.autoplay = true;
+        remoteVideo.playsInline = true;
+        remoteVideo.width = 640;
+        remoteVideo.height = 480;
+        remoteVideo.style.position = 'fixed';
+        remoteVideo.style.top = '-9999px';
+        remoteVideo.style.left = '-9999px';
+        remoteVideo.style.width = '640px';
+        remoteVideo.style.height = '480px';
+        document.body.appendChild(remoteVideo);
+        videoElements[userId] = remoteVideo;
+        createdVideoElements.push(remoteVideo);
     });
+    
+    console.log('Created', Object.keys(videoElements).length, 'video elements for recording');
     
     // Wait for all videos to be ready and playing
     const videoPromises = Object.entries(videoElements).map(([key, video]) => {
         return new Promise((resolve) => {
-            // If video already has srcObject and is playing, resolve immediately
-            if (video.srcObject && video.readyState >= 2 && !video.paused) {
-                resolve();
-                return;
-            }
-            
-            // Wait for metadata and play
-            const onCanPlay = () => {
-                video.play().then(() => {
-                    // Wait a bit for video to start rendering
-                    setTimeout(resolve, 100);
-                }).catch(resolve);
+            const checkReady = () => {
+                if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+                    console.log('Video ready:', key, video.videoWidth, 'x', video.videoHeight);
+                    resolve();
+                } else {
+                    setTimeout(checkReady, 50);
+                }
             };
             
-            if (video.readyState >= 2) {
-                onCanPlay();
-            } else {
-                video.addEventListener('canplay', onCanPlay, { once: true });
+            video.addEventListener('loadedmetadata', () => {
+                video.play().then(() => {
+                    setTimeout(checkReady, 200);
+                }).catch(err => {
+                    console.warn('Error playing video:', key, err);
+                    setTimeout(checkReady, 200);
+                });
+            }, { once: true });
+            
+            // If already has metadata, try immediately
+            if (video.readyState >= 1) {
+                video.play().then(() => {
+                    setTimeout(checkReady, 200);
+                }).catch(() => {
+                    setTimeout(checkReady, 200);
+                });
             }
         });
     });
     
     Promise.all(videoPromises).then(() => {
-        // Wait a bit more to ensure videos are rendering
-        setTimeout(() => {
-            // Start drawing loop
-            function drawFrame() {
-                if (!isRecording) return;
+        console.log('All videos ready, starting recording');
+        
+        // Start drawing loop
+        function drawFrame() {
+            if (!isRecording) return;
+            
+            // Clear canvas
+            recordingContext.fillStyle = '#000';
+            recordingContext.fillRect(0, 0, recordingCanvas.width, recordingCanvas.height);
+            
+            const streamKeys = Object.keys(videoElements);
+            const count = streamKeys.length;
+            
+            if (count === 1) {
+                // Single stream - full screen
+                const video = videoElements[streamKeys[0]];
+                if (video && video.readyState >= 2 && video.videoWidth > 0) {
+                    try {
+                        recordingContext.drawImage(video, 0, 0, recordingCanvas.width, recordingCanvas.height);
+                    } catch (e) {
+                        console.warn('Error drawing video:', e);
+                    }
+                }
+            } else if (count === 2) {
+                // Two streams - side by side
+                const video1 = videoElements[streamKeys[0]];
+                const video2 = videoElements[streamKeys[1]];
+                if (video1 && video1.readyState >= 2 && video1.videoWidth > 0) {
+                    try {
+                        recordingContext.drawImage(video1, 0, 0, recordingCanvas.width / 2, recordingCanvas.height);
+                    } catch (e) {
+                        console.warn('Error drawing video1:', e);
+                    }
+                }
+                if (video2 && video2.readyState >= 2 && video2.videoWidth > 0) {
+                    try {
+                        recordingContext.drawImage(video2, recordingCanvas.width / 2, 0, recordingCanvas.width / 2, recordingCanvas.height);
+                    } catch (e) {
+                        console.warn('Error drawing video2:', e);
+                    }
+                }
+            } else {
+                // Multiple streams - grid layout
+                const cols = Math.ceil(Math.sqrt(count));
+                const rows = Math.ceil(count / cols);
+                const cellWidth = recordingCanvas.width / cols;
+                const cellHeight = recordingCanvas.height / rows;
                 
-                // Clear canvas
-                recordingContext.fillStyle = '#000';
-                recordingContext.fillRect(0, 0, recordingCanvas.width, recordingCanvas.height);
-                
-                const streamKeys = Object.keys(videoElements);
-                const count = streamKeys.length;
-                
-                if (count === 1) {
-                    // Single stream - full screen
-                    const video = videoElements[streamKeys[0]];
+                streamKeys.forEach((key, index) => {
+                    const video = videoElements[key];
                     if (video && video.readyState >= 2 && video.videoWidth > 0) {
                         try {
-                            recordingContext.drawImage(video, 0, 0, recordingCanvas.width, recordingCanvas.height);
+                            const col = index % cols;
+                            const row = Math.floor(index / cols);
+                            recordingContext.drawImage(video, col * cellWidth, row * cellHeight, cellWidth, cellHeight);
                         } catch (e) {
-                            console.warn('Error drawing video:', e);
+                            console.warn('Error drawing video:', key, e);
                         }
                     }
-                } else if (count === 2) {
-                    // Two streams - side by side
-                    const video1 = videoElements[streamKeys[0]];
-                    const video2 = videoElements[streamKeys[1]];
-                    if (video1 && video1.readyState >= 2 && video1.videoWidth > 0) {
-                        try {
-                            recordingContext.drawImage(video1, 0, 0, recordingCanvas.width / 2, recordingCanvas.height);
-                        } catch (e) {
-                            console.warn('Error drawing video1:', e);
-                        }
-                    }
-                    if (video2 && video2.readyState >= 2 && video2.videoWidth > 0) {
-                        try {
-                            recordingContext.drawImage(video2, recordingCanvas.width / 2, 0, recordingCanvas.width / 2, recordingCanvas.height);
-                        } catch (e) {
-                            console.warn('Error drawing video2:', e);
-                        }
-                    }
-                } else {
-                    // Multiple streams - grid layout
-                    const cols = Math.ceil(Math.sqrt(count));
-                    const rows = Math.ceil(count / cols);
-                    const cellWidth = recordingCanvas.width / cols;
-                    const cellHeight = recordingCanvas.height / rows;
-                    
-                    streamKeys.forEach((key, index) => {
-                        const video = videoElements[key];
-                        if (video && video.readyState >= 2 && video.videoWidth > 0) {
-                            try {
-                                const col = index % cols;
-                                const row = Math.floor(index / cols);
-                                recordingContext.drawImage(video, col * cellWidth, row * cellHeight, cellWidth, cellHeight);
-                            } catch (e) {
-                                console.warn('Error drawing video:', key, e);
-                            }
-                        }
-                    });
-                }
-                
-                recordingAnimationFrame = requestAnimationFrame(drawFrame);
-            }
-            
-            // Start drawing loop first
-            drawFrame();
-            
-            // Get combined audio tracks
-            const streamToUse = isScreenSharing ? screenShareStream : (processedLocalStream || localStream);
-            
-            // Create canvas stream
-            const combinedStream = recordingCanvas.captureStream(30);
-            
-            // Add audio tracks (just local for now - mixing multiple audio requires AudioContext)
-            if (streamToUse) {
-                streamToUse.getAudioTracks().forEach(track => {
-                    combinedStream.addTrack(track);
                 });
             }
             
-            // Start recording
-            recordedChunks = [];
-            const options = {
-                mimeType: 'video/webm;codecs=vp9,opus',
-                videoBitsPerSecond: 2500000
-            };
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                options.mimeType = 'video/webm;codecs=vp8,opus';
+            recordingAnimationFrame = requestAnimationFrame(drawFrame);
+        }
+        
+        // Start drawing loop first
+        drawFrame();
+        
+        // Get combined audio tracks
+        const streamToUse = isScreenSharing ? screenShareStream : (processedLocalStream || localStream);
+        
+        // Create canvas stream
+        const combinedStream = recordingCanvas.captureStream(30);
+        
+        // Add audio tracks (just local for now - mixing multiple audio requires AudioContext)
+        if (streamToUse) {
+            streamToUse.getAudioTracks().forEach(track => {
+                combinedStream.addTrack(track);
+            });
+        }
+        
+        // Start recording
+        recordedChunks = [];
+        const options = {
+            mimeType: 'video/webm;codecs=vp9,opus',
+            videoBitsPerSecond: 2500000
+        };
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options.mimeType = 'video/webm;codecs=vp8,opus';
+        }
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options.mimeType = 'video/webm';
+        }
+        
+        mediaRecorder = new MediaRecorder(combinedStream, options);
+        
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                recordedChunks.push(event.data);
             }
-            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                options.mimeType = 'video/webm';
+        };
+        
+        mediaRecorder.onstop = () => {
+            console.log('Recording stopped');
+            // Stop drawing
+            if (recordingAnimationFrame) {
+                cancelAnimationFrame(recordingAnimationFrame);
             }
             
-            mediaRecorder = new MediaRecorder(combinedStream, options);
+            // Clean up video elements we created
+            createdVideoElements.forEach(video => {
+                video.srcObject = null;
+                video.remove();
+            });
             
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    recordedChunks.push(event.data);
-                }
-            };
-            
-            mediaRecorder.onstop = () => {
-                // Stop drawing
-                if (recordingAnimationFrame) {
-                    cancelAnimationFrame(recordingAnimationFrame);
-                }
-                
-                // Clean up only videos we created (not existing DOM elements)
-                Object.entries(videoElements).forEach(([key, video]) => {
-                    // Only remove if we created it (has our special styling)
-                    if (video.style.position === 'absolute' && video.style.width === '1px') {
-                        video.srcObject = null;
-                        video.remove();
-                    }
-                });
-                
-                const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                const url = URL.createObjectURL(blob);
-                downloadRecording(url);
-            };
-            
-            mediaRecorder.start(1000);
-            isRecording = true;
-            updateRecordButton(true);
-        }, 200); // Small delay to ensure videos are rendering
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            downloadRecording(url);
+        };
+        
+        mediaRecorder.start(1000);
+        isRecording = true;
+        updateRecordButton(true);
+        console.log('Recording started');
     }).catch(err => {
         console.error('Error preparing recording:', err);
         alert('Error starting recording: ' + err.message);
         // Clean up
+        createdVideoElements.forEach(video => video.remove());
         recordingCanvas = null;
         recordingContext = null;
     });
@@ -1075,6 +1082,7 @@ function updateCallButtons(state) {
         if (endCallBtn) endCallBtn.classList.add('hidden');
         if (blurBtn) blurBtn.style.display = 'none';
         if (videoBtn) videoBtn.style.display = 'none';
+        if (addParticipantBtn) addParticipantBtn.style.display = 'none';
         if (screenShareBtn) screenShareBtn.style.display = 'none';
     } else if (state === 'active') {
         if (acceptBtn) acceptBtn.classList.add('hidden');
@@ -1084,11 +1092,47 @@ function updateCallButtons(state) {
         if (blurBtn) blurBtn.style.display = currentCallType === 'video' ? 'flex' : 'none';
         if (videoBtn) videoBtn.style.display = currentCallType === 'video' ? 'flex' : 'none';
         if (screenShareBtn) screenShareBtn.style.display = currentCallType === 'video' ? 'flex' : 'none';
+        if (addParticipantBtn) addParticipantBtn.style.display = 'flex';
     }
 }
 
 function hideCallModal() {
     const modal = document.getElementById('callModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+function showAddParticipantModal() {
+    if (!currentCall || !currentCall.callId) return;
+    
+    const modal = document.getElementById('addParticipantModal');
+    if (!modal) return;
+    
+    // Add click handlers to participant cards
+    const cards = modal.querySelectorAll('.participant-card');
+    cards.forEach(card => {
+        card.onclick = function() {
+            const userId = parseInt(this.getAttribute('data-user-id'));
+            const userName = this.getAttribute('data-user-name');
+            
+            // Check if user is already in call
+            if (currentCall.participants.find(p => p.id === userId)) {
+                alert(userName + ' is already in the call');
+                return;
+            }
+            
+            // Add participant
+            addParticipantToCall(userId);
+            hideAddParticipantModal();
+        };
+    });
+    
+    modal.classList.remove('hidden');
+}
+
+function hideAddParticipantModal() {
+    const modal = document.getElementById('addParticipantModal');
     if (modal) {
         modal.classList.add('hidden');
     }

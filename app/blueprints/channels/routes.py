@@ -43,13 +43,17 @@ def view(workspace_slug, channel_slug):
     ).order_by(MessageHighlight.created_at.desc()).limit(10).all()
     highlighted_messages = [h.message for h in highlights]
     
+    # Get workspace members for adding to calls
+    members = workspace.members
+    
     return render_template(
         'channel/view.html',
         workspace=workspace,
         channel=channel,
         channels=accessible_channels,
         pinned_messages=pinned_messages,
-        highlighted_messages=highlighted_messages
+        highlighted_messages=highlighted_messages,
+        members=members
     )
 
 

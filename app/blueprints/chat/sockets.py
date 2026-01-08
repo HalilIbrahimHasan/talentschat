@@ -592,6 +592,11 @@ def on_add_participant(data):
                 'participants': [{'id': uid, 'name': 'User'} for uid in call['participants'] if uid != user_id]
             }, room=user_socket_id)
             
+            # Get user name
+            from app.models.user import User
+            user = User.query.get(user_id)
+            user_name = user.name if user else 'User'
+            
             # Notify existing participants
             for participant_id in call['participants']:
                 if participant_id != user_id and participant_id != current_user.id:
@@ -605,7 +610,7 @@ def on_add_participant(data):
                         emit('participant_joined', {
                             'call_id': call_id,
                             'user_id': user_id,
-                            'user_name': 'User'
+                            'user_name': user_name
                         }, room=participant_socket_id)
     
     return True
