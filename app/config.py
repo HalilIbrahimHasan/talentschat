@@ -14,6 +14,9 @@ class Config:
     SQLALCHEMY_DATABASE_URI = database_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
+    # Note: SQLALCHEMY_ENGINE_OPTIONS is set dynamically in app/__init__.py
+    # based on database type for eventlet compatibility
+    
     # Upload settings
     UPLOAD_FOLDER = basedir / 'uploads'
     MAX_CONTENT_LENGTH = 200 * 1024 * 1024  # 200MB max file size

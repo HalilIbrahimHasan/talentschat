@@ -7,6 +7,23 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
     
+    # Configure SQLAlchemy engine options for eventlet compatibility
+    from sqlalchemy.pool import NullPool
+    import os
+    database_url = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+    if database_url.startswith('sqlite'):
+        # For SQLite with eventlet, use NullPool to avoid threading issues
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'poolclass': NullPool,
+            'connect_args': {'check_same_thread': False}
+        }
+    else:
+        # For PostgreSQL, use pool settings compatible with eventlet
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_pre_ping': True,
+            'pool_recycle': 3600,
+        }
+    
     # Initialize extensions
     db.init_app(app)
     login_manager.init_app(app)
@@ -77,72 +94,74 @@ def create_app(config_class=Config):
     with app.app_context():
         db.create_all()
         
-        # Migrate existing workspaces table to add new columns
-        try:
-            from sqlalchemy import text
-            conn = db.engine.connect()
-            
-            # Check if is_public column exists
-            result = conn.execute(text("PRAGMA table_info(workspaces)"))
-            columns = [row[1] for row in result]
-            
-            if 'is_public' not in columns:
-                conn.execute(text("ALTER TABLE workspaces ADD COLUMN is_public BOOLEAN DEFAULT 1"))
-                conn.commit()
-                print("Added is_public column to workspaces")
-            
-            if 'invite_code' not in columns:
-                conn.execute(text("ALTER TABLE workspaces ADD COLUMN invite_code VARCHAR(20)"))
-                conn.commit()
-                print("Added invite_code column to workspaces")
-                
-                # Generate invite codes for existing workspaces
-                from app.models.workspace import Workspace
-                from app.utils.ids import generate_invite_code
-                workspaces = Workspace.query.filter(Workspace.invite_code == None).all()
-                for ws in workspaces:
-                    ws.invite_code = generate_invite_code()
-                db.session.commit()
-                print(f"Generated invite codes for {len(workspaces)} existing workspaces")
-            
-            # Migrate videos table to add new columns
+        # Migrate existing tables (SQLite-specific migrations)
+        # Only run if using SQLite, skip for PostgreSQL
+        database_url = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+        if database_url.startswith('sqlite'):
             try:
-                result = conn.execute(text("PRAGMA table_info(videos)"))
-                video_columns = [row[1] for row in result]
+                from sqlalchemy import text
+                conn = db.engine.connect()
                 
-                if 'external_url' not in video_columns:
-                    conn.execute(text("ALTER TABLE videos ADD COLUMN external_url VARCHAR(500)"))
-                    conn.commit()
-                    print("Added external_url column to videos")
+                # Check if is_public column exists
+                result = conn.execute(text("PRAGMA table_info(workspaces)"))
+                columns = [row[1] for row in result]
                 
-                if 'video_type' not in video_columns:
-                    conn.execute(text("ALTER TABLE videos ADD COLUMN video_type VARCHAR(20) DEFAULT 'upload'"))
+                if 'is_public' not in columns:
+                    conn.execute(text("ALTER TABLE workspaces ADD COLUMN is_public BOOLEAN DEFAULT 1"))
                     conn.commit()
-                    print("Added video_type column to videos")
-            except Exception as ve:
-                print(f"Video migration note: {ve}")
-            
-            # Migrate users table to add profile fields
-            try:
-                result = conn.execute(text("PRAGMA table_info(users)"))
-                user_columns = [row[1] for row in result]
+                    print("Added is_public column to workspaces")
                 
-                if 'profile_image' not in user_columns:
-                    conn.execute(text("ALTER TABLE users ADD COLUMN profile_image VARCHAR(255)"))
+                if 'invite_code' not in columns:
+                    conn.execute(text("ALTER TABLE workspaces ADD COLUMN invite_code VARCHAR(20)"))
                     conn.commit()
-                    print("Added profile_image column to users")
+                    print("Added invite_code column to workspaces")
+                    
+                    # Generate invite codes for existing workspaces
+                    from app.models.workspace import Workspace
+                    from app.utils.ids import generate_invite_code
+                    workspaces = Workspace.query.filter(Workspace.invite_code == None).all()
+                    for ws in workspaces:
+                        ws.invite_code = generate_invite_code()
+                    db.session.commit()
+                    print(f"Generated invite codes for {len(workspaces)} existing workspaces")
                 
-                if 'bio' not in user_columns:
-                    conn.execute(text("ALTER TABLE users ADD COLUMN bio TEXT"))
-                    conn.commit()
-                    print("Added bio column to users")
-            except Exception as ue:
-                print(f"User migration note: {ue}")
-            
-            conn.close()
-        except Exception as e:
-            print(f"Migration note: {e}")
-            # If migration fails, tables might not exist yet - that's okay
+                # Migrate videos table to add new columns
+                try:
+                    result = conn.execute(text("PRAGMA table_info(videos)"))
+                    video_columns = [row[1] for row in result]
+                    
+                    if 'external_url' not in video_columns:
+                        conn.execute(text("ALTER TABLE videos ADD COLUMN external_url VARCHAR(500)"))
+                        conn.commit()
+                        print("Added external_url column to videos")
+                    
+                    if 'video_type' not in video_columns:
+                        conn.execute(text("ALTER TABLE videos ADD COLUMN video_type VARCHAR(20) DEFAULT 'upload'"))
+                        conn.commit()
+                        print("Added video_type column to videos")
+                except Exception as ve:
+                    print(f"Video migration note: {ve}")
+                
+                # Migrate users table to add profile fields
+                try:
+                    result = conn.execute(text("PRAGMA table_info(users)"))
+                    user_columns = [row[1] for row in result]
+                    
+                    if 'profile_image' not in user_columns:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN profile_image VARCHAR(255)"))
+                        conn.commit()
+                        print("Added profile_image column to users")
+                    
+                    if 'bio' not in user_columns:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN bio TEXT"))
+                        conn.commit()
+                        print("Added bio column to users")
+                except Exception as ue:
+                    print(f"User migration note: {ue}")
+                
+                conn.close()
+            except Exception as e:
+                print(f"Migration note: {e}")
+                # If migration fails, tables might not exist yet - that's okay
     
     return app
-
