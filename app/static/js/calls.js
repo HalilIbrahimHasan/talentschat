@@ -141,11 +141,8 @@ function acceptCall() {
         updateCallUI();
         stopRingtone();
         
-        // Create peer connection with caller and create offer (callee initiates connection)
-        const caller = currentCall.participants.find(p => !p.isLocal && p.id !== CURRENT_USER_ID);
-        if (caller) {
-            createPeerConnection(caller.id, true);
-        }
+        // Don't create peer connection here - wait for caller's offer
+        // The caller will create peer connection and send offer after receiving call_accepted
     }).catch(err => {
         console.error('Error getting local media:', err);
         rejectCall();

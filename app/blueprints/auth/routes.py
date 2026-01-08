@@ -38,8 +38,10 @@ def register():
         user.set_password(form.password.data)
         db.session.add(user)
         db.session.commit()
-        flash('Registration successful! Please log in.', 'success')
-        return redirect(url_for('auth.login'))
+        # Auto-login after registration
+        login_user(user, remember=False)
+        flash('Registration successful! Welcome!', 'success')
+        return redirect(url_for('workspaces.dashboard'))
     return render_template('auth/register.html', form=form)
 
 
