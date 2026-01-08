@@ -345,3 +345,336 @@ def on_typing(data):
         'channel_id': channel_id
     }, room=room, include_self=False)
 
+
+# Call signaling - track active calls
+# {call_id: {'participants': [user_ids], 'type': 'video'|'audio', 'creator_id': int}}
+active_calls = {}
+
+
+@socketio.on('initiate_call')
+def on_initiate_call(data):
+    """Initiate a call"""
+    if not current_user.is_authenticated:
+        return False
+    
+    callee_id = data.get('callee_id')
+    call_type = data.get('type', 'video')  # 'video' or 'audio'
+    
+    if not callee_id:
+        return False
+    
+    # Get callee's socket ID from online users
+    callee_socket_id = None
+    caller_room = None
+    for room, users in online_users.items():
+        if callee_id in users:
+            callee_socket_id = users[callee_id].get('socket_id')
+        if current_user.id in users:
+            caller_room = room
+        if callee_socket_id and caller_room:
+            break
+    
+    if not callee_socket_id:
+        emit('call_error', {'message': 'User is not online'})
+        return False
+    
+    call_id = f"call_{current_user.id}_{callee_id}_{int(datetime.utcnow().timestamp())}"
+    active_calls[call_id] = {
+        'participants': [current_user.id, callee_id],
+        'type': call_type,
+        'creator_id': current_user.id,
+        'room': caller_room
+    }
+    
+    # Emit to callee
+    emit('incoming_call', {
+        'call_id': call_id,
+        'caller_id': current_user.id,
+        'caller_name': current_user.name,
+        'type': call_type,
+        'participants': [{'id': current_user.id, 'name': current_user.name}]
+    }, room=callee_socket_id)
+    
+    return {'call_id': call_id}
+
+
+@socketio.on('accept_call')
+def on_accept_call(data):
+    """Accept a call"""
+    if not current_user.is_authenticated:
+        return False
+    
+    call_id = data.get('call_id')
+    if not call_id or call_id not in active_calls:
+        return False
+    
+    call = active_calls[call_id]
+    if current_user.id not in call['participants']:
+        call['participants'].append(current_user.id)
+    
+    # Notify all other participants
+    participants_to_notify = [uid for uid in call['participants'] if uid != current_user.id]
+    for participant_id in participants_to_notify:
+        participant_socket_id = None
+        for room, users in online_users.items():
+            if participant_id in users:
+                participant_socket_id = users[participant_id].get('socket_id')
+                break
+        
+        if participant_socket_id:
+            emit('call_accepted', {
+                'call_id': call_id,
+                'callee_id': current_user.id,
+                'callee_name': current_user.name
+            }, room=participant_socket_id)
+    
+    # Notify about participant joined to all
+    for participant_id in call['participants']:
+        if participant_id != current_user.id:
+            participant_socket_id = None
+            for room, users in online_users.items():
+                if participant_id in users:
+                    participant_socket_id = users[participant_id].get('socket_id')
+                    break
+            
+            if participant_socket_id:
+                emit('participant_joined', {
+                    'call_id': call_id,
+                    'user_id': current_user.id,
+                    'user_name': current_user.name
+                }, room=participant_socket_id)
+    
+    return True
+
+
+@socketio.on('reject_call')
+def on_reject_call(data):
+    """Reject a call"""
+    if not current_user.is_authenticated:
+        return False
+    
+    call_id = data.get('call_id')
+    if not call_id or call_id not in active_calls:
+        return False
+    
+    call = active_calls[call_id]
+    
+    # Notify all participants
+    for participant_id in call['participants']:
+        if participant_id != current_user.id:
+            participant_socket_id = None
+            for room, users in online_users.items():
+                if participant_id in users:
+                    participant_socket_id = users[participant_id].get('socket_id')
+                    break
+            
+            if participant_socket_id:
+                emit('call_rejected', {
+                    'call_id': call_id,
+                    'callee_id': current_user.id
+                }, room=participant_socket_id)
+    
+    # Remove call if only creator remains or remove user from participants
+    if len(call['participants']) <= 1 or call['creator_id'] == current_user.id:
+        if call_id in active_calls:
+            del active_calls[call_id]
+    else:
+        call['participants'].remove(current_user.id)
+    
+    return True
+
+
+@socketio.on('end_call')
+def on_end_call(data):
+    """End a call"""
+    if not current_user.is_authenticated:
+        return False
+    
+    call_id = data.get('call_id')
+    if not call_id or call_id not in active_calls:
+        return False
+    
+    call = active_calls[call_id]
+    
+    # Notify all participants
+    for participant_id in call['participants']:
+        if participant_id != current_user.id:
+            participant_socket_id = None
+            for room, users in online_users.items():
+                if participant_id in users:
+                    participant_socket_id = users[participant_id].get('socket_id')
+                    break
+            
+            if participant_socket_id:
+                emit('call_ended', {
+                    'call_id': call_id,
+                    'ended_by': current_user.id
+                }, room=participant_socket_id)
+                emit('participant_left', {
+                    'call_id': call_id,
+                    'user_id': current_user.id
+                }, room=participant_socket_id)
+    
+    # Remove call
+    if call_id in active_calls:
+        del active_calls[call_id]
+    
+    return True
+
+
+@socketio.on('call_ice_candidate')
+def on_call_ice_candidate(data):
+    """Handle ICE candidate for WebRTC"""
+    if not current_user.is_authenticated:
+        return False
+    
+    call_id = data.get('call_id')
+    candidate = data.get('candidate')
+    to_user_id = data.get('to_user_id')
+    
+    if not call_id or call_id not in active_calls:
+        return False
+    
+    call = active_calls[call_id]
+    if current_user.id not in call['participants']:
+        return False
+    
+    # Forward ICE candidate to target user
+    target_socket_id = None
+    for room, users in online_users.items():
+        if to_user_id in users:
+            target_socket_id = users[to_user_id].get('socket_id')
+            break
+    
+    if target_socket_id:
+        emit('call_ice_candidate', {
+            'call_id': call_id,
+            'candidate': candidate,
+            'from_user_id': current_user.id
+        }, room=target_socket_id)
+    
+    return True
+
+
+@socketio.on('add_participant')
+def on_add_participant(data):
+    """Add participant to existing call"""
+    if not current_user.is_authenticated:
+        return False
+    
+    call_id = data.get('call_id')
+    user_id = data.get('user_id')
+    
+    if not call_id or call_id not in active_calls:
+        return False
+    
+    call = active_calls[call_id]
+    if current_user.id not in call['participants']:
+        return False
+    
+    if user_id not in call['participants']:
+        call['participants'].append(user_id)
+        
+        # Get user's socket ID
+        user_socket_id = None
+        for room, users in online_users.items():
+            if user_id in users:
+                user_socket_id = users[user_id].get('socket_id')
+                break
+        
+        if user_socket_id:
+            # Notify user about incoming call
+            emit('incoming_call', {
+                'call_id': call_id,
+                'caller_id': current_user.id,
+                'caller_name': current_user.name,
+                'type': call['type'],
+                'participants': [{'id': uid, 'name': 'User'} for uid in call['participants'] if uid != user_id]
+            }, room=user_socket_id)
+            
+            # Notify existing participants
+            for participant_id in call['participants']:
+                if participant_id != user_id and participant_id != current_user.id:
+                    participant_socket_id = None
+                    for room, users in online_users.items():
+                        if participant_id in users:
+                            participant_socket_id = users[participant_id].get('socket_id')
+                            break
+                    
+                    if participant_socket_id:
+                        emit('participant_joined', {
+                            'call_id': call_id,
+                            'user_id': user_id,
+                            'user_name': 'User'
+                        }, room=participant_socket_id)
+    
+    return True
+
+
+@socketio.on('call_offer')
+def on_call_offer(data):
+    """Handle WebRTC offer"""
+    if not current_user.is_authenticated:
+        return False
+    
+    call_id = data.get('call_id')
+    offer = data.get('offer')
+    to_user_id = data.get('to_user_id')
+    
+    if not call_id or call_id not in active_calls:
+        return False
+    
+    call = active_calls[call_id]
+    if current_user.id not in call['participants']:
+        return False
+    
+    # Forward offer to target user
+    target_socket_id = None
+    for room, users in online_users.items():
+        if to_user_id in users:
+            target_socket_id = users[to_user_id].get('socket_id')
+            break
+    
+    if target_socket_id:
+        emit('call_offer', {
+            'call_id': call_id,
+            'offer': offer,
+            'from_user_id': current_user.id
+        }, room=target_socket_id)
+    
+    return True
+
+
+@socketio.on('call_answer')
+def on_call_answer(data):
+    """Handle WebRTC answer"""
+    if not current_user.is_authenticated:
+        return False
+    
+    call_id = data.get('call_id')
+    answer = data.get('answer')
+    to_user_id = data.get('to_user_id')
+    
+    if not call_id or call_id not in active_calls:
+        return False
+    
+    call = active_calls[call_id]
+    if current_user.id not in call['participants']:
+        return False
+    
+    # Forward answer to target user
+    target_socket_id = None
+    for room, users in online_users.items():
+        if to_user_id in users:
+            target_socket_id = users[to_user_id].get('socket_id')
+            break
+    
+    if target_socket_id:
+        emit('call_answer', {
+            'call_id': call_id,
+            'answer': answer,
+            'from_user_id': current_user.id
+        }, room=target_socket_id)
+    
+    return True
+

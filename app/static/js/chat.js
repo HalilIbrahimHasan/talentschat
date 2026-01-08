@@ -27,6 +27,11 @@ function initSocket() {
         console.log('✅ Connected to server, socket ID:', socket.id);
         socket.emit('join_room', { channel_id: currentChannelId });
         console.log('📤 Emitted join_room for channel:', currentChannelId);
+        
+        // Initialize calls after socket is connected
+        if (typeof initCalls === 'function') {
+            initCalls();
+        }
     });
     
     socket.on('joined_room', (data) => {
@@ -122,7 +127,21 @@ function addMessageToUI(message) {
         </a>
         <div class="flex-1 ${bgGradient} rounded-2xl p-4 shadow-md hover:shadow-lg transition">
             <div class="flex items-center justify-between mb-2">
-                <a href="/profile/${message.user_id}" class="text-sm font-bold ${isOwn ? 'text-indigo-700' : 'text-gray-900'} hover:underline transition">${message.user_name}</a>
+                <div class="flex items-center space-x-2">
+                    <a href="/profile/${message.user_id}" class="text-sm font-bold ${isOwn ? 'text-indigo-700' : 'text-gray-900'} hover:underline transition">${message.user_name}</a>
+                    ${!isOwn ? `
+                    <button onclick="if (typeof initiateCall !== 'undefined') { initiateCall(${message.user_id}, '${escapeHtml(message.user_name)}', 'audio'); }" 
+                            class="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition text-xs" 
+                            title="Audio call">
+                        <i class="fas fa-phone"></i>
+                    </button>
+                    <button onclick="if (typeof initiateCall !== 'undefined') { initiateCall(${message.user_id}, '${escapeHtml(message.user_name)}', 'video'); }" 
+                            class="p-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg transition text-xs" 
+                            title="Video call">
+                        <i class="fas fa-video"></i>
+                    </button>
+                    ` : ''}
+                </div>
                 <span class="text-xs ${isOwn ? 'text-indigo-600' : 'text-gray-500'} font-medium">${formatTime(message.created_at)}</span>
             </div>
             <div class="text-gray-800 mb-3 leading-relaxed">${message.content_html || message.content}</div>
@@ -685,10 +704,24 @@ function updateOnlineUsers(users) {
     // Show other online users
     filteredUsers.forEach(user => {
         html += `
-            <a href="/profile/${user.id}" class="flex items-center space-x-2 px-2 py-1 rounded text-xs hover:bg-white/20 transition">
-                <div class="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span class="text-white/90 hover:text-white">${escapeHtml(user.name)}</span>
-            </a>
+            <div class="flex items-center justify-between px-2 py-2 rounded hover:bg-white/20 transition">
+                <a href="/profile/${user.id}" class="flex items-center space-x-2 flex-1 text-xs">
+                    <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span class="text-white/90 hover:text-white font-medium">${escapeHtml(user.name)}</span>
+                </a>
+                <div class="flex space-x-1">
+                    <button onclick="if (typeof initiateCall !== 'undefined') { initiateCall(${user.id}, '${escapeHtml(user.name)}', 'audio'); }" 
+                            class="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition shadow-md hover:shadow-lg" 
+                            title="Audio call">
+                        <i class="fas fa-phone text-xs"></i>
+                    </button>
+                    <button onclick="if (typeof initiateCall !== 'undefined') { initiateCall(${user.id}, '${escapeHtml(user.name)}', 'video'); }" 
+                            class="p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition shadow-md hover:shadow-lg" 
+                            title="Video call">
+                        <i class="fas fa-video text-xs"></i>
+                    </button>
+                </div>
+            </div>
         `;
     });
     

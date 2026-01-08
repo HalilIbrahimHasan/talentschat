@@ -207,10 +207,74 @@
     </div>
 </div>
 
+<!-- Call Modal -->
+<div id="callModal" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center">
+    <div class="bg-gradient-to-br from-indigo-900 to-purple-900 rounded-2xl p-6 max-w-7xl w-full mx-4 shadow-2xl">
+        <div class="text-center mb-4">
+            <h2 id="callTitle" class="text-2xl font-bold text-white mb-1">Calling...</h2>
+            <p id="callStatus" class="text-white/80 text-sm"></p>
+        </div>
+        
+        <!-- Participants List -->
+        <div id="callParticipants" class="hidden text-center mb-4 text-white text-sm"></div>
+        
+        <!-- Video Grid -->
+        <div id="videoGrid" class="grid grid-cols-2 gap-4 mb-6" style="min-height: 400px;">
+            <!-- Videos will be dynamically added here -->
+        </div>
+        
+        <!-- Call Controls -->
+        <div class="flex items-center justify-center space-x-3 flex-wrap">
+            <button id="muteBtn" onclick="toggleMute()" class="w-12 h-12 bg-white/20 hover:bg-white/30 text-white rounded-full flex items-center justify-center transition" title="Mute/Unmute">
+                <i class="fas fa-microphone text-lg"></i>
+            </button>
+            <button id="videoBtn" onclick="toggleVideo()" class="w-12 h-12 bg-white/20 hover:bg-white/30 text-white rounded-full flex items-center justify-center transition" title="Turn Video On/Off">
+                <i class="fas fa-video text-lg"></i>
+            </button>
+            <button id="screenShareBtn" onclick="isScreenSharing ? stopScreenShare() : startScreenShare()" class="w-12 h-12 bg-purple-500 hover:bg-purple-600 text-white rounded-full flex items-center justify-center transition" title="Share Screen">
+                <i class="fas fa-desktop text-lg"></i>
+            </button>
+            <button id="recordBtn" onclick="isRecording ? stopRecording() : startRecording()" class="w-12 h-12 bg-gray-500 hover:bg-gray-600 text-white rounded-full flex items-center justify-center transition" title="Record Call">
+                <i class="fas fa-circle text-lg"></i>
+            </button>
+            <button id="acceptCallBtn" onclick="acceptCall()" class="w-14 h-14 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center transition shadow-lg" title="Accept Call">
+                <i class="fas fa-phone text-xl"></i>
+            </button>
+            <button id="rejectCallBtn" onclick="rejectCall()" class="w-14 h-14 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition shadow-lg" title="Reject Call">
+                <i class="fas fa-phone-slash text-xl"></i>
+            </button>
+            <button id="endCallBtn" onclick="endCall()" class="w-14 h-14 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center transition shadow-lg" title="End Call">
+                <i class="fas fa-phone-slash text-xl"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/calls.js') }}"></script>
 <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 <script src="{{ url_for('static', filename='js/uploads.js') }}"></script>
 <script src="{{ url_for('static', filename='js/reactions.js') }}"></script>
 <script src="{{ url_for('static', filename='js/highlights.js') }}"></script>
 <script src="{{ url_for('static', filename='js/recording.js') }}"></script>
+<script>
+    // Initialize calls after socket is connected
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize calls after socket is initialized (called from chat.js)
+        if (typeof socket !== 'undefined' && socket && socket.connected) {
+            initCalls();
+        } else {
+            // Wait for socket to connect
+            const checkSocket = setInterval(() => {
+                if (typeof socket !== 'undefined' && socket && socket.connected) {
+                    initCalls();
+                    clearInterval(checkSocket);
+                }
+            }, 100);
+            
+            // Stop checking after 5 seconds
+            setTimeout(() => clearInterval(checkSocket), 5000);
+        }
+    });
+</script>
 {% endblock %}
 
