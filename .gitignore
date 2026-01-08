@@ -4,24 +4,14 @@ __pycache__/
 *$py.class
 *.so
 .Python
-venv/
 env/
+venv/
 ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+env.bak/
+venv.bak/
 *.egg-info/
-.installed.cfg
-*.egg
+dist/
+build/
 
 # Flask
 instance/
@@ -33,9 +23,9 @@ instance/
 *.sqlite3
 app.db
 
-# Uploads
-uploads/
-!uploads/.gitkeep
+# Environment variables
+.env
+.env.local
 
 # IDE
 .vscode/
@@ -48,10 +38,14 @@ uploads/
 .DS_Store
 Thumbs.db
 
-# Environment
-.env
-.env.local
+# Uploads (keep structure but ignore files)
+uploads/*
+!uploads/.gitkeep
 
 # Logs
 *.log
+logs/
 
+# Deployment
+.vercel
+.netlify

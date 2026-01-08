@@ -1,158 +1,132 @@
 # TalentsChat
 
-A Slack-like team collaboration platform built with Flask, featuring real-time chat, file sharing, video uploads, and highlights.
+A real-time chat application built with Flask, featuring workspaces, channels, video calls, file sharing, and more.
 
 ## Features
 
-### MVP Features
-- **Authentication**: User registration, login, and password reset (placeholder)
-- **Workspaces & Channels**: Create and manage workspaces with public/private channels
-- **Real-time Chat**: WebSocket-based messaging with SocketIO
-- **Emoji Reactions**: Add reactions (👍 😂 ❤️) to messages
-- **Message Highlights & Pins**: Highlight and pin important messages
-- **File Uploads**: Upload documents, images, and archives
-- **Video Uploads**: Upload and share videos with like functionality
-- **Code Snippets**: Share code snippets with syntax highlighting
-- **Mobile-Friendly UI**: Responsive design with Tailwind CSS
+- 🔐 User authentication and authorization
+- 👥 Workspaces and channels management
+- 💬 Real-time messaging with SocketIO
+- 📹 Video and audio calling with screen sharing
+- 📁 File and document sharing
+- 🎥 Video uploads and playback
+- 📝 Articles/blog system
+- 👤 User profiles with badges and ratings
+- ⭐ Emoji reactions and message highlighting
+- 📊 Online user presence
 
 ## Tech Stack
 
-- **Backend**: Flask 3.0
-- **Database**: SQLite (dev) / PostgreSQL (prod)
-- **ORM**: SQLAlchemy
-- **Real-time**: Flask-SocketIO
-- **Authentication**: Flask-Login
-- **Frontend**: Jinja2 templates + Vanilla JavaScript
-- **Styling**: Tailwind CSS (CDN)
+- **Backend**: Flask, Flask-SocketIO, SQLAlchemy
+- **Frontend**: HTML, CSS (Tailwind), JavaScript
+- **Database**: SQLite (development) / PostgreSQL (production)
+- **Real-time**: WebSockets via SocketIO
+- **Video Calls**: WebRTC
 
 ## Installation
 
-1. **Clone the repository** (or navigate to the project directory)
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd talentschat
+   ```
 
-2. **Create a virtual environment** (recommended):
-```bash
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+2. **Create a virtual environment**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
 
-3. **Install dependencies**:
-```bash
-pip install -r requirements.txt
-```
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-4. **Set environment variables** (optional):
-```bash
-export SECRET_KEY='your-secret-key-here'
-export DATABASE_URL='postgresql://user:pass@localhost/dbname'  # Optional, defaults to SQLite
-```
+4. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env and set SECRET_KEY
+   ```
 
-5. **Run the application**:
-```bash
-python run.py
-```
+5. **Run the application**
+   ```bash
+   python run.py
+   ```
 
-6. **Access the application**:
-   - Open your browser and go to `http://localhost:5000`
-   - Register a new account or log in
-   - Create your first workspace!
+6. **Access the application**
+   - Open http://localhost:8000 in your browser
+
+## Deployment
+
+This application is ready for deployment on various platforms. **Netlify is NOT suitable** for Flask applications.
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
+
+### Quick Deploy Options:
+
+- **Render.com** (Recommended - Free tier available)
+- **Railway.app** (Easy setup)
+- **Heroku** (Classic platform)
+- **Fly.io** (Modern alternative)
+- **DigitalOcean App Platform**
+
+## Configuration
+
+### Environment Variables
+
+- `SECRET_KEY`: Flask secret key for sessions (required in production)
+- `DATABASE_URL`: Database connection string
+- `FLASK_ENV`: Set to `production` for production deployment
+- `PORT`: Server port (default: 8000)
+
+### Database
+
+- **Development**: SQLite (app.db)
+- **Production**: PostgreSQL (recommended)
+
+To use PostgreSQL, add `psycopg2-binary` to requirements.txt (already included) and set `DATABASE_URL` to your PostgreSQL connection string.
 
 ## Project Structure
 
 ```
 talentschat/
 ├── app/
-│   ├── __init__.py          # App factory
+│   ├── __init__.py          # Flask app factory
 │   ├── config.py            # Configuration
 │   ├── extensions.py        # Flask extensions
+│   ├── blueprints/          # Application blueprints
 │   ├── models/              # Database models
-│   ├── blueprints/          # Route blueprints
-│   │   ├── auth/           # Authentication
-│   │   ├── workspaces/      # Workspace management
-│   │   ├── channels/        # Channel management
-│   │   ├── chat/            # Chat & SocketIO
-│   │   ├── files/           # File uploads
-│   │   ├── videos/          # Video features
-│   │   └── api/             # JSON API endpoints
-│   ├── services/            # Business logic
-│   ├── templates/           # Jinja2 templates
-│   ├── static/              # CSS, JS, images
+│   ├── templates/           # HTML templates
+│   ├── static/              # Static files (CSS, JS, images)
+│   ├── services/            # Business logic services
 │   └── utils/               # Utility functions
-├── migrations/              # Database migrations (future)
-├── uploads/                 # Uploaded files (created automatically)
+├── uploads/                 # User uploads (not in git)
+├── requirements.txt         # Python dependencies
 ├── run.py                   # Application entry point
-└── requirements.txt         # Python dependencies
+└── DEPLOYMENT.md            # Deployment guide
 ```
-
-## Usage
-
-### Creating a Workspace
-1. After logging in, click "Create Workspace"
-2. Enter a workspace name
-3. You'll be automatically added as the owner
-
-### Creating Channels
-1. Navigate to your workspace
-2. Click "Create Channel"
-3. Choose a name and set it as private (optional)
-4. Start chatting!
-
-### Sending Messages
-- Type in the message input at the bottom
-- Press Enter or click Send
-- Messages appear in real-time for all channel members
-
-### Adding Reactions
-- Click the reaction button (👍 😂 ❤️) on any message
-- Choose an emoji to react
-
-### Highlighting Messages
-- Click the "⭐ Highlight" button on any message
-- Highlighted messages appear in the right sidebar
-
-### Uploading Files
-- Click the paperclip icon in the chat input
-- Select files to upload
-- Files appear in the Documents page
-
-### Uploading Videos
-- Click the paperclip icon and select a video file
-- Videos are uploaded and can be viewed in the Videos feed
-- Like videos by clicking the heart icon
 
 ## Development
 
-### Database
-The app uses SQLite by default for development. Tables are created automatically on first run.
+### Running in Development Mode
 
-For production, set the `DATABASE_URL` environment variable to use PostgreSQL.
+```bash
+python run.py
+```
 
-### File Storage
-Uploads are stored in the `uploads/` directory:
-- `uploads/files/` - Documents and images
-- `uploads/videos/` - Video files
-- `uploads/avatars/` - User avatars (future)
+The app will run with debug mode enabled on http://localhost:8000
 
-### Security Notes
-- Change `SECRET_KEY` in production
-- File uploads are validated by extension and size
-- CSRF protection is enabled for forms
-- Private channels require explicit membership
+### Adding New Features
 
-## Future Enhancements (v1.1)
-
-- Full-text search for messages
-- @mentions for users
-- Read receipts / last seen
-- Notification badges
-- Email notifications
-- Advanced file previews
-- Video comments (partially implemented)
+- Blueprints go in `app/blueprints/`
+- Models go in `app/models/`
+- Templates go in `app/templates/`
+- Static files go in `app/static/`
 
 ## License
 
-This project is built for educational/demonstration purposes.
+[Your License Here]
 
 ## Support
 
-For issues or questions, please check the code comments or create an issue in the repository.
-
+For deployment help, see [DEPLOYMENT.md](DEPLOYMENT.md)
