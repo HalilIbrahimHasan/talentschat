@@ -42,14 +42,15 @@ def save_profile_image(file):
     return None
 
 
-@bp.route('/profile')
+@bp.route('')
+@bp.route('/')
 @login_required
 def view():
     """View own profile"""
     return redirect(url_for('profile.view_user', user_id=current_user.id))
 
 
-@bp.route('/profile/<int:user_id>')
+@bp.route('/<int:user_id>')
 @login_required
 def view_user(user_id):
     """View any user's profile"""
@@ -80,7 +81,7 @@ def view_user(user_id):
                          recent_videos=recent_videos)
 
 
-@bp.route('/profile/edit', methods=['GET', 'POST'])
+@bp.route('/edit', methods=['GET', 'POST'])
 @login_required
 def edit():
     """Edit own profile"""
@@ -109,7 +110,7 @@ def edit():
     return render_template('profile/edit.html', form=form)
 
 
-@bp.route('/profile/change-password', methods=['GET', 'POST'])
+@bp.route('/change-password', methods=['GET', 'POST'])
 @login_required
 def change_password():
     """Change password"""
@@ -128,7 +129,7 @@ def change_password():
     return render_template('profile/change_password.html', form=form)
 
 
-@bp.route('/profile/image/<path:filename>')
+@bp.route('/image/<path:filename>')
 @login_required
 def serve_image(filename):
     """Serve profile images"""

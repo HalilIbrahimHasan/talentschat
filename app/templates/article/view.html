@@ -64,17 +64,27 @@
             </div>
         </div>
         
-        <div class="prose prose-lg max-w-none text-gray-800 leading-relaxed">
-            {% if article.content_html %}
-            <div class="article-content">{{ article.content_html|safe }}</div>
+        <div class="prose prose-lg max-w-none text-gray-800 leading-relaxed py-6 border-t-2 border-purple-100 mt-6">
+            <h2 class="text-3xl font-bold text-purple-700 mb-6">Article Content</h2>
+            {% if article.content_html and article.content_html.strip() and article.content_html.strip() != '<p></p>' %}
+            <div class="article-content whitespace-pre-wrap text-lg leading-relaxed">{{ article.content_html|safe }}</div>
+            {% elif article.content and article.content.strip() %}
+            <div class="whitespace-pre-wrap text-lg leading-relaxed">{{ article.content }}</div>
             {% else %}
-            <div class="whitespace-pre-wrap text-lg">{{ article.content }}</div>
+            <div class="text-gray-500 italic p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                <i class="fas fa-exclamation-triangle mr-2"></i>No content available for this article.
+            </div>
             {% endif %}
         </div>
     </article>
 </div>
 
 <style>
+.article-content {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+}
 .article-content h1, .article-content h2, .article-content h3 {
     color: #4f46e5;
     font-weight: bold;
@@ -84,10 +94,15 @@
 .article-content p {
     margin-bottom: 1em;
     line-height: 1.8;
+    white-space: pre-wrap;
 }
 .article-content strong {
     color: #7c3aed;
     font-weight: 700;
+}
+.article-content br {
+    display: block;
+    margin: 0.5em 0;
 }
 </style>
 {% endblock %}

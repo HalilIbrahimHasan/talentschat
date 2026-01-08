@@ -30,7 +30,21 @@ class Article(db.Model):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if not self.slug and self.title:
-            self.slug = generate_slug(self.title)
+            base_slug = generate_slug(self.title)
+            # Ensure slug is unique within workspace
+            if self.workspace_id:
+                self.slug = self._make_unique_slug(base_slug)
+            else:
+                self.slug = base_slug
+    
+    def _make_unique_slug(self, base_slug):
+        """Generate a unique slug by appending a number if needed"""
+        slug = base_slug
+        counter = 1
+        while Article.query.filter_by(workspace_id=self.workspace_id, slug=slug).first():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        return slug
     
     def set_content_html(self):
         """Convert markdown/content to HTML"""
@@ -49,31 +63,67 @@ class Article(db.Model):
         }
         
         # Basic markdown-like conversion
+        if not self.content or not self.content.strip():
+            self.content_html = '<p></p>'
+            return
+            
         html = self.content
         
-        # Convert newlines to <br>
-        html = html.replace('\n\n', '</p><p>')
-        html = html.replace('\n', '<br>')
+        # Convert headers first (before other processing)
+        import re
+        html = re.sub(r'^### (.+)$', r'<h3>\1</h3>', html, flags=re.MULTILINE)
+        html = re.sub(r'^## (.+)$', r'<h2>\1</h2>', html, flags=re.MULTILINE)
+        html = re.sub(r'^# (.+)$', r'<h1>\1</h1>', html, flags=re.MULTILINE)
         
-        # Headers
-        html = html.replace('### ', '<h3>').replace('\n', '</h3>')
-        html = html.replace('## ', '<h2>').replace('\n', '</h2>')
-        html = html.replace('# ', '<h1>').replace('\n', '</h1>')
+        # Convert bold text **text** to <strong>text</strong>
+        html = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', html)
         
-        # Bold and italic
-        html = html.replace('**', '<strong>').replace('**', '</strong>')
-        html = html.replace('*', '<em>').replace('*', '</em>')
+        # Convert italic text *text* to <em>text</em> (but not if already in strong)
+        html = re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'<em>\1</em>', html)
         
-        # Wrap in paragraph if not already wrapped
-        if not html.startswith('<'):
+        # Split by double newlines for paragraphs, but preserve existing HTML tags
+        # Only split if the line doesn't start with an HTML tag
+        lines = html.split('\n')
+        paragraphs = []
+        current_para = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                if current_para:
+                    paragraphs.append(' '.join(current_para))
+                    current_para = []
+            elif line.startswith('<'):
+                # Already HTML, add as-is
+                if current_para:
+                    paragraphs.append(' '.join(current_para))
+                    current_para = []
+                paragraphs.append(line)
+            else:
+                current_para.append(line)
+        
+        if current_para:
+            paragraphs.append(' '.join(current_para))
+        
+        # Join paragraphs with </p><p> tags
+        if paragraphs:
+            html = '</p><p>'.join(paragraphs)
+            # Wrap in paragraph tags
+            if not html.startswith('<'):
+                html = f'<p>{html}</p>'
+        else:
             html = f'<p>{html}</p>'
         
-        # Sanitize
+        # Convert remaining single newlines within paragraphs to <br>
+        # But avoid breaking HTML tags
+        html = re.sub(r'(?<!>)\n(?!<)', '<br>', html)
+        
+        # Sanitize - but don't strip, just clean
         self.content_html = bleach.clean(
             html,
             tags=allowed_tags,
             attributes=allowed_attrs,
-            strip=True
+            strip=False  # Don't strip, just clean
         )
     
     def publish(self):

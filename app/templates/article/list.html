@@ -25,10 +25,16 @@
                 <div class="flex items-start justify-between mb-4">
                     <div class="flex-1">
                         <h3 class="text-xl font-bold text-gray-900 mb-3">
+                            {% if article.is_published or article.author_id == current_user.id %}
                             <a href="{{ url_for('articles.view', workspace_slug=workspace.slug, article_slug=article.slug) }}" 
                                class="hover:text-purple-600 transition">
                                 {{ article.title }}
                             </a>
+                            {% else %}
+                            <span class="text-gray-500 cursor-not-allowed" title="Draft - only author can view">
+                                {{ article.title }}
+                            </span>
+                            {% endif %}
                         </h3>
                         {% if article.excerpt %}
                         <p class="text-gray-600 text-sm mb-4 leading-relaxed">{{ article.excerpt[:150] }}{% if article.excerpt|length > 150 %}...{% endif %}</p>
