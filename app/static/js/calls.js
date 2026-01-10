@@ -55,6 +55,7 @@ function initCalls() {
     socket.on('call_accepted', (data) => {
         console.log('Call accepted by', data.user_id);
         if (currentCall && currentCall.callId === data.call_id) {
+            callState = 'active';
             currentCall.participants.push({ id: data.user_id, name: data.user_name || 'User', isLocal: false });
             
             // Create peer connection for the new participant
@@ -63,6 +64,8 @@ function initCalls() {
             // Get local media and create offer
             getLocalMedia(currentCallType, false).then(() => {
                 createOffer(data.user_id);
+                showCallModal('active', '', currentCallType);
+                updateCallButtons();
             }).catch(err => {
                 console.error('Error getting local media:', err);
             });
@@ -225,26 +228,51 @@ function endCall() {
         });
     }
     
-    // Stop all media tracks
+    // Stop all media tracks FIRST to ensure camera/mic turn off
     if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
+        localStream.getTracks().forEach(track => {
+            track.stop();
+            console.log('Stopped local track:', track.kind);
+        });
         localStream = null;
     }
     
     if (screenShareStream) {
-        screenShareStream.getTracks().forEach(track => track.stop());
+        screenShareStream.getTracks().forEach(track => {
+            track.stop();
+            console.log('Stopped screen share track:', track.kind);
+        });
         screenShareStream = null;
     }
     
     if (processedLocalStream) {
-        processedLocalStream.getTracks().forEach(track => track.stop());
+        processedLocalStream.getTracks().forEach(track => {
+            track.stop();
+            console.log('Stopped processed stream track:', track.kind);
+        });
         processedLocalStream = null;
     }
     
     // Close all peer connections
-    Object.values(peerConnections).forEach(pc => pc.close());
+    Object.values(peerConnections).forEach(pc => {
+        pc.close();
+        console.log('Closed peer connection');
+    });
     peerConnections = {};
     remoteStreams = {};
+    
+    // Clean up video elements
+    const localVideo = document.getElementById('localVideo');
+    if (localVideo) {
+        localVideo.srcObject = null;
+    }
+    
+    Object.keys(remoteStreams).forEach(userId => {
+        const remoteVideo = document.getElementById(`remoteVideoStream-${userId}`);
+        if (remoteVideo) {
+            remoteVideo.srcObject = null;
+        }
+    });
     
     currentCall = null;
     currentCallType = null;
@@ -261,17 +289,17 @@ function endCall() {
     recordingStartTime = null;
     hideRecordingTimer();
     
-    // Stop screen share if active
-    if (isScreenSharing) {
-        stopScreenShare();
-    }
-    
     // Clean up audio elements
     Object.values(remoteAudioElements).forEach(audio => {
+        if (audio.srcObject) {
+            audio.srcObject.getTracks().forEach(track => track.stop());
+        }
         audio.srcObject = null;
         audio.remove();
     });
     remoteAudioElements = {};
+    
+    console.log('Call ended, all tracks stopped');
 }
 
 async function getLocalMedia(type, screenShare) {
@@ -1025,15 +1053,20 @@ function updateCallButtons() {
     // Use callState to determine which buttons to show
     const isIncoming = callState === 'incoming';
     const isActive = callState === 'active';
+    const isCalling = callState === 'calling';
     
+    // For incoming calls: show accept/reject, hide others
     if (acceptBtn) acceptBtn.classList.toggle('hidden', !isIncoming);
     if (rejectBtn) rejectBtn.classList.toggle('hidden', !isIncoming);
-    if (endBtn) endBtn.classList.toggle('hidden', !isActive);
+    
+    // For active calls: show all controls
+    // For calling state: show end button only
+    if (endBtn) endBtn.classList.toggle('hidden', !isActive && !isCalling);
     if (muteBtn) muteBtn.classList.toggle('hidden', !isActive || currentCallType === 'audio');
     if (videoBtn) videoBtn.classList.toggle('hidden', !isActive || currentCallType === 'audio');
     if (screenShareBtn) screenShareBtn.classList.toggle('hidden', !isActive || currentCallType === 'audio');
     if (recordBtn) recordBtn.classList.toggle('hidden', !isActive);
-    if (minimizeBtn) minimizeBtn.classList.toggle('hidden', !isActive);
+    if (minimizeBtn) minimizeBtn.classList.toggle('hidden', !isActive && !isCalling);
     if (addParticipantBtn) addParticipantBtn.classList.toggle('hidden', !isActive);
 }
 
