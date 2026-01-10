@@ -19,6 +19,8 @@ let backgroundVideo = null;
 let recordingCanvas = null;
 let recordingContext = null;
 let recordingAnimationFrame = null;
+let recordingStartTime = null;
+let recordingTimerInterval = null;
 let isCallModalMinimized = false;
 let remoteAudioElements = {}; // {userId: HTMLAudioElement}
 
@@ -843,7 +845,10 @@ function startCallRecording() {
         mediaRecorder.start(1000);
         isRecording = true;
         window.isRecordingCall = true;
+        recordingStartTime = Date.now();
         updateRecordButton(true);
+        updateRecordingTimer();
+        showRecordingTimer();
         console.log('Recording started with', count, 'streams');
     }).catch(err => {
         console.error('Error preparing recording:', err);
@@ -863,7 +868,15 @@ function stopCallRecording() {
     mediaRecorder.stop();
     isRecording = false;
     window.isRecordingCall = false;
+    recordingStartTime = null;
     updateRecordButton(false);
+    hideRecordingTimer();
+    
+    // Stop recording timer
+    if (recordingTimerInterval) {
+        clearInterval(recordingTimerInterval);
+        recordingTimerInterval = null;
+    }
     
     // Stop drawing loop
     if (recordingAnimationFrame) {
@@ -873,6 +886,45 @@ function stopCallRecording() {
     
     recordingCanvas = null;
     recordingContext = null;
+}
+
+function updateRecordingTimer() {
+    if (!isRecording || !recordingStartTime) {
+        hideRecordingTimer();
+        return;
+    }
+    
+    const elapsed = Date.now() - recordingStartTime;
+    const minutes = Math.floor(elapsed / 60000);
+    const seconds = Math.floor((elapsed % 60000) / 1000);
+    
+    const timerElement = document.getElementById('callRecordingTime');
+    if (timerElement) {
+        timerElement.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+    
+    // Start interval if not already running
+    if (!recordingTimerInterval) {
+        recordingTimerInterval = setInterval(updateRecordingTimer, 1000);
+    }
+}
+
+function showRecordingTimer() {
+    const timerContainer = document.getElementById('callRecordingTimer');
+    if (timerContainer) {
+        timerContainer.classList.remove('hidden');
+    }
+}
+
+function hideRecordingTimer() {
+    const timerContainer = document.getElementById('callRecordingTimer');
+    if (timerContainer) {
+        timerContainer.classList.add('hidden');
+    }
+    const timerElement = document.getElementById('callRecordingTime');
+    if (timerElement) {
+        timerElement.textContent = '00:00';
+    }
 }
 
 function downloadRecording(url) {
@@ -890,6 +942,14 @@ function cleanupCall() {
     if (isRecording) {
         stopCallRecording();
     }
+    
+    // Clear recording timer
+    if (recordingTimerInterval) {
+        clearInterval(recordingTimerInterval);
+        recordingTimerInterval = null;
+    }
+    recordingStartTime = null;
+    hideRecordingTimer();
     
     // Stop screen share if active
     if (isScreenSharing) {
