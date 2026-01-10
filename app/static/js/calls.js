@@ -571,21 +571,23 @@ function startCallRecording() {
     console.log('Starting recording...');
     
     // Get or create a container for recording video elements
-    // Note: Container must be in DOM and visible (but can be off-screen) for canvas capture to work
+    // Note: Container must be in viewport (even if tiny) for canvas capture to work in some browsers
     let recordingContainer = document.getElementById('recordingVideoContainer');
     if (!recordingContainer) {
         recordingContainer = document.createElement('div');
         recordingContainer.id = 'recordingVideoContainer';
-        // Position off-screen but keep visible for canvas capture
-        recordingContainer.style.cssText = 'position: fixed; top: -9999px; left: -9999px; width: 1280px; height: 720px; z-index: -1; opacity: 1; pointer-events: none; background: #000; visibility: visible;';
+        // Position in viewport but make it tiny and clip it - required for canvas capture
+        recordingContainer.style.cssText = 'position: fixed; top: 0; left: 0; width: 1280px; height: 720px; z-index: -9999; opacity: 1; pointer-events: none; background: #000; visibility: visible; clip-path: inset(100% 100% 0 0); overflow: hidden;';
         document.body.appendChild(recordingContainer);
     } else {
-        // Make sure container is visible (off-screen)
-        recordingContainer.style.top = '-9999px';
-        recordingContainer.style.left = '-9999px';
+        // Make sure container is in viewport but clipped
+        recordingContainer.style.top = '0';
+        recordingContainer.style.left = '0';
         recordingContainer.style.opacity = '1';
         recordingContainer.style.visibility = 'visible';
-        recordingContainer.style.zIndex = '-1';
+        recordingContainer.style.zIndex = '-9999';
+        recordingContainer.style.clipPath = 'inset(100% 100% 0 0)';
+        recordingContainer.style.overflow = 'hidden';
     }
     
     // Create canvas for compositing all streams
@@ -843,12 +845,11 @@ function startCallRecording() {
                 recordingContext = null;
             }
             
-            // Hide and clean up recording container
+            // Clean up recording container (keep it for next recording but clip it)
             const recordingContainer = document.getElementById('recordingVideoContainer');
             if (recordingContainer) {
+                recordingContainer.style.clipPath = 'inset(100% 100% 0 0)';
                 recordingContainer.style.opacity = '0';
-                recordingContainer.style.visibility = 'hidden';
-                recordingContainer.style.zIndex = '-9999';
             }
             
             // Close audio context
@@ -953,7 +954,7 @@ async function downloadRecordingAsZip(videoBlob) {
             const url = URL.createObjectURL(videoBlob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `call-recording-${Date.now()}.mp4`;
+            a.download = `call-recording-${Date.now()}.webm`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -965,8 +966,8 @@ async function downloadRecordingAsZip(videoBlob) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0] + '_' + Date.now();
         const folderName = `call-recording-${timestamp}`;
         
-        // Add video file to zip (using .mp4 extension for compatibility, though content is WebM)
-        const videoFileName = `${folderName}.mp4`;
+        // Add video file to zip (using .webm extension - VLC supports WebM)
+        const videoFileName = `${folderName}.webm`;
         zip.file(videoFileName, videoBlob);
         
         // Create info file with recording details
@@ -987,8 +988,8 @@ Participants: ${participants}
 Total Participants: ${currentCall ? currentCall.participants.length : 0}
 
 Video File: ${videoFileName}
-Format: WebM (VP9/VP8 + Opus) - File extension is .mp4 for compatibility
-Note: Browser-based recording uses WebM format. To convert to true MP4, use a video converter tool.
+Format: WebM (VP9/VP8 + Opus)
+Compatible with: VLC Media Player, Chrome, Firefox, Edge, and most modern video players
 `;
         
         zip.file('RECORDING_INFO.txt', infoContent);
