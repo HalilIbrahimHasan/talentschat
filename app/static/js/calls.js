@@ -812,7 +812,7 @@ function startCallRecording() {
             }
         };
         
-        mediaRecorder.onstop = () => {
+        mediaRecorder.onstop = async () => {
             console.log('Recording stopped');
             // Stop drawing
             if (recordingAnimationFrame) {
@@ -838,8 +838,7 @@ function startCallRecording() {
             }
             
             const blob = new Blob(recordedChunks, { type: 'video/webm' });
-            const url = URL.createObjectURL(blob);
-            downloadRecording(url);
+            await downloadRecordingAsZip(blob);
         };
         
         mediaRecorder.start(1000);
@@ -924,6 +923,83 @@ function hideRecordingTimer() {
     const timerElement = document.getElementById('callRecordingTime');
     if (timerElement) {
         timerElement.textContent = '00:00';
+    }
+}
+
+async function downloadRecordingAsZip(videoBlob) {
+    try {
+        if (typeof JSZip === 'undefined') {
+            // Fallback to direct download if JSZip is not available
+            console.warn('JSZip not available, downloading video directly');
+            const url = URL.createObjectURL(videoBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `call-recording-${Date.now()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            return;
+        }
+        
+        const zip = new JSZip();
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0] + '_' + Date.now();
+        const folderName = `call-recording-${timestamp}`;
+        
+        // Add video file to zip
+        const videoFileName = `${folderName}.webm`;
+        zip.file(videoFileName, videoBlob);
+        
+        // Create info file with recording details
+        const recordingDuration = recordingStartTime ? Math.floor((Date.now() - recordingStartTime) / 1000) : 0;
+        const minutes = Math.floor(recordingDuration / 60);
+        const seconds = recordingDuration % 60;
+        const participants = currentCall ? currentCall.participants.map(p => p.name).join(', ') : 'Unknown';
+        const callType = currentCallType || 'video';
+        const hasScreenShare = isScreenSharing ? 'Yes' : 'No';
+        
+        const infoContent = `Call Recording Information
+============================
+Date: ${new Date().toLocaleString()}
+Duration: ${minutes}:${String(seconds).padStart(2, '0')}
+Call Type: ${callType}
+Screen Share: ${hasScreenShare}
+Participants: ${participants}
+Total Participants: ${currentCall ? currentCall.participants.length : 0}
+
+Video File: ${videoFileName}
+Format: WebM (VP9/VP8 + Opus)
+`;
+        
+        zip.file('RECORDING_INFO.txt', infoContent);
+        
+        // Generate zip file
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const zipUrl = URL.createObjectURL(zipBlob);
+        
+        // Download zip file
+        const a = document.createElement('a');
+        a.href = zipUrl;
+        a.download = `${folderName}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        // Clean up
+        URL.revokeObjectURL(zipUrl);
+        
+        console.log('Recording downloaded as ZIP file');
+    } catch (error) {
+        console.error('Error creating ZIP file:', error);
+        // Fallback to direct download
+        const url = URL.createObjectURL(videoBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `call-recording-${Date.now()}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 }
 
