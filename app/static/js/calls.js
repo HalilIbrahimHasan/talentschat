@@ -229,7 +229,38 @@ function endCall() {
         });
     }
     
-    // Stop all media tracks FIRST to ensure camera/mic turn off
+    // Clean up video elements FIRST using current remoteStreams
+    const localVideo = document.getElementById('localVideo');
+    if (localVideo) {
+        localVideo.srcObject = null;
+    }
+    
+    Object.keys(remoteStreams).forEach(userId => {
+        const remoteVideo = document.getElementById(`remoteVideoStream-${userId}`);
+        if (remoteVideo) {
+            remoteVideo.srcObject = null;
+        }
+    });
+    
+    // Aggressively stop all tracks in peer connections
+    Object.values(peerConnections).forEach(pc => {
+        pc.getSenders().forEach(sender => {
+            try {
+                if (sender.track) {
+                    sender.track.stop();
+                }
+            } catch (e) {
+                // Ignore errors when stopping tracks
+            }
+        });
+        pc.ontrack = null;
+        pc.onicecandidate = null;
+        pc.onconnectionstatechange = null;
+        pc.close();
+        console.log('Closed peer connection');
+    });
+    
+    // Stop all media tracks
     if (localStream) {
         localStream.getTracks().forEach(track => {
             track.stop();
@@ -254,26 +285,9 @@ function endCall() {
         processedLocalStream = null;
     }
     
-    // Close all peer connections
-    Object.values(peerConnections).forEach(pc => {
-        pc.close();
-        console.log('Closed peer connection');
-    });
+    // Reset maps AFTER cleaning up elements
     peerConnections = {};
     remoteStreams = {};
-    
-    // Clean up video elements
-    const localVideo = document.getElementById('localVideo');
-    if (localVideo) {
-        localVideo.srcObject = null;
-    }
-    
-    Object.keys(remoteStreams).forEach(userId => {
-        const remoteVideo = document.getElementById(`remoteVideoStream-${userId}`);
-        if (remoteVideo) {
-            remoteVideo.srcObject = null;
-        }
-    });
     
     currentCall = null;
     currentCallType = null;
@@ -569,13 +583,16 @@ function startCallRecording() {
     
     console.log('Starting recording...');
     
-    // Create a container for recording video elements (hidden but in viewport)
+    // Create a container for recording video elements (real size but invisible)
     let recordingContainer = document.getElementById('recordingVideoContainer');
     if (!recordingContainer) {
         recordingContainer = document.createElement('div');
         recordingContainer.id = 'recordingVideoContainer';
-        recordingContainer.style.cssText = 'position: fixed; top: 0; right: 0; width: 1px; height: 1px; opacity: 0.01; z-index: 999999; pointer-events: none; overflow: hidden;';
+        recordingContainer.style.cssText = 'position: fixed; top: 0; left: 0; width: 1280px; height: 720px; opacity: 0; z-index: -1; pointer-events: none; overflow: hidden;';
         document.body.appendChild(recordingContainer);
+    } else {
+        // Reset container if it exists
+        recordingContainer.style.cssText = 'position: fixed; top: 0; left: 0; width: 1280px; height: 720px; opacity: 0; z-index: -1; pointer-events: none; overflow: hidden;';
     }
     
     // Clear previous recording elements
@@ -616,7 +633,7 @@ function startCallRecording() {
             const remoteVideo = document.createElement('video');
             remoteVideo.id = `recordingRemoteVideo-${userId}`;
             remoteVideo.srcObject = remoteStream;
-            remoteVideo.muted = false;
+            remoteVideo.muted = true; // MUST be muted for reliable autoplay (audio captured via AudioContext)
             remoteVideo.autoplay = true;
             remoteVideo.playsInline = true;
             remoteVideo.setAttribute('playsinline', 'true');
@@ -995,22 +1012,88 @@ function toggleMute() {
     }
 }
 
-function toggleVideo() {
+async function stopCamera() {
     if (!localStream) return;
     
-    const videoTracks = localStream.getVideoTracks();
-    videoTracks.forEach(track => {
-        track.enabled = !track.enabled;
+    // Stop all video tracks
+    localStream.getVideoTracks().forEach(track => {
+        track.stop();
+        console.log('Stopped camera track');
     });
     
+    // Also stop processed stream video tracks if they exist
+    if (processedLocalStream) {
+        processedLocalStream.getVideoTracks().forEach(track => {
+            track.stop();
+        });
+    }
+}
+
+async function startCamera() {
+    if (!localStream) return;
+    
+    try {
+        // Reacquire camera video track
+        const camStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                facingMode: 'user'
+            }, 
+            audio: false 
+        });
+        const newTrack = camStream.getVideoTracks()[0];
+        
+        // Replace in localStream
+        const oldTracks = localStream.getVideoTracks();
+        oldTracks.forEach(oldTrack => {
+            localStream.removeTrack(oldTrack);
+            oldTrack.stop();
+        });
+        localStream.addTrack(newTrack);
+        
+        // Also update processedLocalStream if it exists
+        if (processedLocalStream) {
+            processedLocalStream.getVideoTracks().forEach(track => track.stop());
+            processedLocalStream = localStream; // Update reference
+        }
+        
+        // Replace in all peer connections
+        Object.values(peerConnections).forEach(pc => {
+            const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+            if (sender) {
+                sender.replaceTrack(newTrack);
+            }
+        });
+        
+        updateLocalVideo();
+        console.log('Camera restarted');
+    } catch (err) {
+        console.error('Error starting camera:', err);
+        alert('Error starting camera: ' + err.message);
+    }
+}
+
+async function toggleVideo() {
+    if (!localStream) return;
+    
+    const hasLiveTrack = localStream.getVideoTracks().some(t => t.readyState === 'live');
+    
     const videoBtn = document.getElementById('videoBtn');
-    if (videoBtn) {
-        if (videoTracks[0] && videoTracks[0].enabled) {
-            videoBtn.innerHTML = '<i class="fas fa-video text-lg"></i>';
-            videoBtn.title = 'Turn off camera';
-        } else {
+    
+    if (hasLiveTrack) {
+        // Turn off camera (actually stop the track)
+        await stopCamera();
+        if (videoBtn) {
             videoBtn.innerHTML = '<i class="fas fa-video-slash text-lg"></i>';
             videoBtn.title = 'Turn on camera';
+        }
+    } else {
+        // Turn on camera (reacquire the track)
+        await startCamera();
+        if (videoBtn) {
+            videoBtn.innerHTML = '<i class="fas fa-video text-lg"></i>';
+            videoBtn.title = 'Turn off camera';
         }
     }
 }
