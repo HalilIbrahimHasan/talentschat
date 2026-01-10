@@ -245,7 +245,7 @@
             <button id="screenShareBtn" onclick="isScreenSharing ? stopScreenShare() : startScreenShare()" class="w-12 h-12 bg-purple-500 hover:bg-purple-600 text-white rounded-full flex items-center justify-center transition" title="Share Screen">
                 <i class="fas fa-desktop text-lg"></i>
             </button>
-            <button id="recordBtn" onclick="isRecording ? stopRecording() : startRecording()" class="w-12 h-12 bg-gray-500 hover:bg-gray-600 text-white rounded-full flex items-center justify-center transition" title="Record Call">
+            <button id="callRecordBtn" onclick="window.isRecordingCall ? stopCallRecording() : startCallRecording()" class="w-12 h-12 bg-gray-500 hover:bg-gray-600 text-white rounded-full flex items-center justify-center transition" title="Record Call">
                 <i class="fas fa-circle text-lg"></i>
             </button>
             <button id="acceptCallBtn" onclick="acceptCall()" class="w-14 h-14 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center transition shadow-lg" title="Accept Call">

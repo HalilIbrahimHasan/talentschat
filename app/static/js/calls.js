@@ -9,6 +9,7 @@ let currentCallType = null; // 'video' or 'audio'
 let mediaRecorder = null;
 let recordedChunks = [];
 let isRecording = false;
+window.isRecordingCall = false; // Global flag for call recording state
 let isScreenSharing = false;
 let backgroundEffect = 'none'; // 'none', 'blur', 'image'
 let backgroundImage = null;
@@ -555,9 +556,14 @@ function stopScreenShare() {
     
     updateScreenShareButton(false);
     updateLocalVideo();
+    
+    // Ensure modal is not minimized after stopping screen share
+    if (isCallModalMinimized) {
+        toggleCallModalMinimize(); // Restore to full size
+    }
 }
 
-function startRecording() {
+function startCallRecording() {
     if (!localStream || isRecording) return;
     
     console.log('Starting recording...');
@@ -575,10 +581,16 @@ function startRecording() {
     const existingLocalVideo = document.getElementById('localVideo');
     if (existingLocalVideo && existingLocalVideo.srcObject) {
         videoElements.local = existingLocalVideo;
+        console.log('Using existing local video element for recording');
     } else {
         // Create new one if doesn't exist
         const localVideo = document.createElement('video');
         const localStreamToUse = isScreenSharing ? screenShareStream : (processedLocalStream || localStream);
+        if (!localStreamToUse) {
+            console.error('No local stream available for recording');
+            alert('Cannot start recording: No video stream available');
+            return;
+        }
         localVideo.srcObject = localStreamToUse;
         localVideo.muted = true;
         localVideo.autoplay = true;
@@ -595,6 +607,7 @@ function startRecording() {
         document.body.appendChild(localVideo);
         videoElements.local = localVideo;
         localVideo.play().catch(console.error);
+        console.log('Created new local video element for recording');
     }
     
     // Get existing remote video elements
@@ -751,16 +764,18 @@ function startRecording() {
         
         mediaRecorder.start(1000);
         isRecording = true;
+        window.isRecordingCall = true;
         updateRecordButton(true);
         console.log('Recording started');
     }, 500); // Give videos time to render
 }
 
-function stopRecording() {
+function stopCallRecording() {
     if (!mediaRecorder || !isRecording) return;
     
     mediaRecorder.stop();
     isRecording = false;
+    window.isRecordingCall = false;
     updateRecordButton(false);
     
     // Stop drawing loop
@@ -786,7 +801,7 @@ function downloadRecording(url) {
 function cleanupCall() {
     // Stop recording if active
     if (isRecording) {
-        stopRecording();
+        stopCallRecording();
     }
     
     // Stop screen share if active
@@ -1229,7 +1244,7 @@ function updateScreenShareButton(isSharing) {
 }
 
 function updateRecordButton(isRecordingState) {
-    const recordBtn = document.getElementById('recordBtn');
+    const recordBtn = document.getElementById('callRecordBtn');
     if (recordBtn) {
         if (isRecordingState) {
             recordBtn.classList.remove('bg-gray-500', 'hover:bg-gray-600');
