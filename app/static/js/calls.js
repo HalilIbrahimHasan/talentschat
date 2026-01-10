@@ -232,58 +232,105 @@ function endCall() {
     // Clean up video elements FIRST using current remoteStreams
     const localVideo = document.getElementById('localVideo');
     if (localVideo) {
+        if (localVideo.srcObject) {
+            // Stop all tracks in the video element's stream
+            const stream = localVideo.srcObject;
+            stream.getTracks().forEach(track => {
+                try {
+                    track.stop();
+                    console.log('Stopped track from localVideo element:', track.kind);
+                } catch (e) {
+                    console.warn('Error stopping track from localVideo:', e);
+                }
+            });
+        }
         localVideo.srcObject = null;
     }
     
     Object.keys(remoteStreams).forEach(userId => {
         const remoteVideo = document.getElementById(`remoteVideoStream-${userId}`);
         if (remoteVideo) {
+            if (remoteVideo.srcObject) {
+                const stream = remoteVideo.srcObject;
+                stream.getTracks().forEach(track => {
+                    try {
+                        track.stop();
+                    } catch (e) {
+                        // Ignore errors
+                    }
+                });
+            }
             remoteVideo.srcObject = null;
         }
     });
     
-    // Aggressively stop all tracks in peer connections
+    // Aggressively stop all tracks in peer connections FIRST
     Object.values(peerConnections).forEach(pc => {
-        pc.getSenders().forEach(sender => {
-            try {
-                if (sender.track) {
-                    sender.track.stop();
+        try {
+            // Stop all sender tracks
+            pc.getSenders().forEach(sender => {
+                try {
+                    if (sender.track) {
+                        sender.track.stop();
+                        console.log('Stopped sender track:', sender.track.kind);
+                    }
+                } catch (e) {
+                    // Ignore errors when stopping tracks
                 }
-            } catch (e) {
-                // Ignore errors when stopping tracks
-            }
-        });
+            });
+            // Stop all receiver tracks
+            pc.getReceivers().forEach(receiver => {
+                try {
+                    if (receiver.track) {
+                        receiver.track.stop();
+                        console.log('Stopped receiver track:', receiver.track.kind);
+                    }
+                } catch (e) {
+                    // Ignore errors
+                }
+            });
+        } catch (e) {
+            console.warn('Error stopping peer connection tracks:', e);
+        }
         pc.ontrack = null;
         pc.onicecandidate = null;
         pc.onconnectionstatechange = null;
-        pc.close();
+        try {
+            pc.close();
+        } catch (e) {
+            console.warn('Error closing peer connection:', e);
+        }
         console.log('Closed peer connection');
     });
     
-    // Stop all media tracks
-    if (localStream) {
-        localStream.getTracks().forEach(track => {
-            track.stop();
-            console.log('Stopped local track:', track.kind);
-        });
-        localStream = null;
-    }
+    // Stop ALL media tracks from all streams (comprehensive cleanup)
+    const streamsToStop = [];
+    if (localStream) streamsToStop.push(localStream);
+    if (screenShareStream) streamsToStop.push(screenShareStream);
+    if (processedLocalStream && processedLocalStream !== localStream) streamsToStop.push(processedLocalStream);
     
-    if (screenShareStream) {
-        screenShareStream.getTracks().forEach(track => {
-            track.stop();
-            console.log('Stopped screen share track:', track.kind);
-        });
-        screenShareStream = null;
-    }
+    // Also stop tracks from remote streams
+    Object.values(remoteStreams).forEach(stream => {
+        if (stream) streamsToStop.push(stream);
+    });
     
-    if (processedLocalStream) {
-        processedLocalStream.getTracks().forEach(track => {
-            track.stop();
-            console.log('Stopped processed stream track:', track.kind);
-        });
-        processedLocalStream = null;
-    }
+    streamsToStop.forEach(stream => {
+        if (stream) {
+            stream.getTracks().forEach(track => {
+                try {
+                    track.stop();
+                    console.log('Stopped track from stream:', track.kind, track.id);
+                } catch (e) {
+                    console.warn('Error stopping track:', e);
+                }
+            });
+        }
+    });
+    
+    // Clear all stream references
+    localStream = null;
+    screenShareStream = null;
+    processedLocalStream = null;
     
     // Reset maps AFTER cleaning up elements
     peerConnections = {};
@@ -307,14 +354,20 @@ function endCall() {
     // Clean up audio elements
     Object.values(remoteAudioElements).forEach(audio => {
         if (audio.srcObject) {
-            audio.srcObject.getTracks().forEach(track => track.stop());
+            audio.srcObject.getTracks().forEach(track => {
+                try {
+                    track.stop();
+                } catch (e) {
+                    // Ignore errors
+                }
+            });
         }
         audio.srcObject = null;
         audio.remove();
     });
     remoteAudioElements = {};
     
-    console.log('Call ended, all tracks stopped');
+    console.log('Call ended, all tracks stopped and cameras should be off');
 }
 
 async function getLocalMedia(type, screenShare) {
