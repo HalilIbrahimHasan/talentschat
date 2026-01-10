@@ -571,12 +571,21 @@ function startCallRecording() {
     console.log('Starting recording...');
     
     // Get or create a container for recording video elements
+    // Note: Container must be in DOM and visible (but can be off-screen) for canvas capture to work
     let recordingContainer = document.getElementById('recordingVideoContainer');
     if (!recordingContainer) {
         recordingContainer = document.createElement('div');
         recordingContainer.id = 'recordingVideoContainer';
-        recordingContainer.style.cssText = 'position: fixed; top: 0; left: 0; width: 1280px; height: 720px; z-index: -9999; opacity: 0; pointer-events: none; background: #000;';
+        // Position off-screen but keep visible for canvas capture
+        recordingContainer.style.cssText = 'position: fixed; top: -9999px; left: -9999px; width: 1280px; height: 720px; z-index: -1; opacity: 1; pointer-events: none; background: #000; visibility: visible;';
         document.body.appendChild(recordingContainer);
+    } else {
+        // Make sure container is visible (off-screen)
+        recordingContainer.style.top = '-9999px';
+        recordingContainer.style.left = '-9999px';
+        recordingContainer.style.opacity = '1';
+        recordingContainer.style.visibility = 'visible';
+        recordingContainer.style.zIndex = '-1';
     }
     
     // Create canvas for compositing all streams
@@ -604,9 +613,10 @@ function startCallRecording() {
     localVideo.muted = true; // Mute local video to avoid echo
     localVideo.autoplay = true;
     localVideo.playsInline = true;
+    localVideo.setAttribute('playsinline', 'true');
     localVideo.width = 640;
     localVideo.height = 480;
-    localVideo.style.cssText = 'position: absolute; top: 0; left: 0; width: 640px; height: 480px;';
+    localVideo.style.cssText = 'position: absolute; top: 0; left: 0; width: 640px; height: 480px; object-fit: cover; background: #000;';
     recordingContainer.appendChild(localVideo);
     videoElements.local = localVideo;
     createdVideoElements.push(localVideo);
@@ -618,6 +628,7 @@ function startCallRecording() {
         remoteVideo.muted = false;
         remoteVideo.autoplay = true;
         remoteVideo.playsInline = true;
+        remoteVideo.setAttribute('playsinline', 'true');
         remoteVideo.width = 640;
         remoteVideo.height = 480;
         
@@ -626,16 +637,16 @@ function startCallRecording() {
         const totalStreams = Object.keys(remoteStreams).length + 1; // +1 for local
         
         if (totalStreams === 1) {
-            remoteVideo.style.cssText = 'position: absolute; top: 0; left: 0; width: 1280px; height: 720px;';
+            remoteVideo.style.cssText = 'position: absolute; top: 0; left: 0; width: 1280px; height: 720px; object-fit: cover; background: #000;';
         } else if (totalStreams === 2) {
-            remoteVideo.style.cssText = `position: absolute; top: 0; left: ${remoteIndex === 1 ? '640px' : '0'}; width: 640px; height: 720px;`;
+            remoteVideo.style.cssText = `position: absolute; top: 0; left: ${remoteIndex === 1 ? '640px' : '0'}; width: 640px; height: 720px; object-fit: cover; background: #000;`;
         } else {
             const cols = Math.ceil(Math.sqrt(totalStreams));
             const col = remoteIndex % cols;
             const row = Math.floor(remoteIndex / cols);
             const cellWidth = 1280 / cols;
             const cellHeight = 720 / Math.ceil(totalStreams / cols);
-            remoteVideo.style.cssText = `position: absolute; top: ${row * cellHeight}px; left: ${col * cellWidth}px; width: ${cellWidth}px; height: ${cellHeight}px;`;
+            remoteVideo.style.cssText = `position: absolute; top: ${row * cellHeight}px; left: ${col * cellWidth}px; width: ${cellWidth}px; height: ${cellHeight}px; object-fit: cover; background: #000;`;
         }
         
         recordingContainer.appendChild(remoteVideo);
@@ -832,6 +843,14 @@ function startCallRecording() {
                 recordingContext = null;
             }
             
+            // Hide and clean up recording container
+            const recordingContainer = document.getElementById('recordingVideoContainer');
+            if (recordingContainer) {
+                recordingContainer.style.opacity = '0';
+                recordingContainer.style.visibility = 'hidden';
+                recordingContainer.style.zIndex = '-9999';
+            }
+            
             // Close audio context
             if (audioContext) {
                 audioContext.close().catch(console.error);
@@ -934,7 +953,7 @@ async function downloadRecordingAsZip(videoBlob) {
             const url = URL.createObjectURL(videoBlob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `call-recording-${Date.now()}.webm`;
+            a.download = `call-recording-${Date.now()}.mp4`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -946,8 +965,8 @@ async function downloadRecordingAsZip(videoBlob) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0] + '_' + Date.now();
         const folderName = `call-recording-${timestamp}`;
         
-        // Add video file to zip
-        const videoFileName = `${folderName}.webm`;
+        // Add video file to zip (using .mp4 extension for compatibility, though content is WebM)
+        const videoFileName = `${folderName}.mp4`;
         zip.file(videoFileName, videoBlob);
         
         // Create info file with recording details
@@ -968,7 +987,8 @@ Participants: ${participants}
 Total Participants: ${currentCall ? currentCall.participants.length : 0}
 
 Video File: ${videoFileName}
-Format: WebM (VP9/VP8 + Opus)
+Format: WebM (VP9/VP8 + Opus) - File extension is .mp4 for compatibility
+Note: Browser-based recording uses WebM format. To convert to true MP4, use a video converter tool.
 `;
         
         zip.file('RECORDING_INFO.txt', infoContent);
