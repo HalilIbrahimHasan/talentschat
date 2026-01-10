@@ -20,6 +20,7 @@ let recordingStartTime = null;
 let recordingTimerInterval = null;
 let isCallModalMinimized = false;
 let remoteAudioElements = {}; // {userId: HTMLAudioElement}
+let callState = null; // 'calling', 'incoming', 'active'
 
 const STUN_SERVERS = {
     iceServers: [
@@ -120,6 +121,7 @@ async function initiateCall(userId, userName, type) {
         return;
     }
     
+    callState = 'calling';
     currentCallType = type;
     currentCall = {
         callId: `call_${Date.now()}_${CURRENT_USER_ID}`,
@@ -131,6 +133,7 @@ async function initiateCall(userId, userName, type) {
     try {
         await getLocalMedia(type, false);
         showCallModal('calling', userName, type);
+        updateCallButtons();
         
         // Emit call initiation
         socket.emit('initiate_call', {
@@ -149,6 +152,7 @@ async function initiateCall(userId, userName, type) {
 
 function handleIncomingCall(data) {
     console.log('Incoming call:', data);
+    callState = 'incoming';
     currentCallType = data.type;
     currentCall = {
         callId: data.call_id,
@@ -157,18 +161,21 @@ function handleIncomingCall(data) {
     };
     
     showCallModal('incoming', data.caller_name, data.type);
+    updateCallButtons();
     playRingtone();
 }
 
 async function acceptCall() {
     if (!currentCall) return;
     
+    callState = 'active';
     stopRingtone();
     
     try {
         await getLocalMedia(currentCallType, false);
         
         showCallModal('active', '', currentCallType);
+        updateCallButtons();
         
         // Create peer connections for all existing participants
         currentCall.participants.forEach(participant => {
@@ -207,6 +214,7 @@ function rejectCall() {
 }
 
 function endCall() {
+    callState = null;
     if (isRecording) {
         stopCallRecording();
     }
@@ -966,12 +974,15 @@ function showCallModal(state, userName, type) {
     modal.classList.remove('hidden');
     
     if (state === 'calling') {
+        callState = 'calling';
         title.textContent = `Calling ${userName}...`;
         status.textContent = 'Waiting for answer...';
     } else if (state === 'incoming') {
+        callState = 'incoming';
         title.textContent = `Incoming ${type === 'video' ? 'Video' : 'Audio'} Call`;
         status.textContent = `${userName} is calling you...`;
     } else if (state === 'active') {
+        callState = 'active';
         title.textContent = `${type === 'video' ? 'Video' : 'Audio'} Call`;
         status.textContent = 'Connected';
         updateCallUI();
@@ -1011,8 +1022,9 @@ function updateCallButtons() {
         return;
     }
     
-    const isActive = currentCall && currentCall.callId;
-    const isIncoming = currentCall && !isActive;
+    // Use callState to determine which buttons to show
+    const isIncoming = callState === 'incoming';
+    const isActive = callState === 'active';
     
     if (acceptBtn) acceptBtn.classList.toggle('hidden', !isIncoming);
     if (rejectBtn) rejectBtn.classList.toggle('hidden', !isIncoming);
