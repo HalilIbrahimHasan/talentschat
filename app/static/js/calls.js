@@ -12,9 +12,6 @@ let isRecording = false;
 window.isRecordingCall = false; // Global flag for call recording state
 let isScreenSharing = false;
 let backgroundEffect = 'none'; // 'none', 'blur', 'image'
-let backgroundImage = null;
-let backgroundCanvas = null;
-let backgroundContext = null;
 let backgroundVideo = null;
 let recordingCanvas = null;
 let recordingContext = null;
@@ -31,326 +28,257 @@ const STUN_SERVERS = {
     ]
 };
 
+// Initialize calls system
 function initCalls() {
-    if (!socket) {
-        console.error('Socket not initialized');
-        return;
-    }
+    console.log('Initializing calls system...');
     
-    // Listen for call events
+    // Listen for incoming calls
     socket.on('incoming_call', handleIncomingCall);
-    socket.on('call_accepted', handleCallAccepted);
-    socket.on('call_rejected', handleCallRejected);
-    socket.on('call_ended', handleCallEnded);
+    
+    // Listen for call accepted
+    socket.on('call_accepted', (data) => {
+        console.log('Call accepted by', data.user_id);
+        if (currentCall && currentCall.callId === data.call_id) {
+            currentCall.participants.push({ id: data.user_id, name: data.user_name || 'User', isLocal: false });
+            
+            // Create peer connection for the new participant
+            createPeerConnection(data.user_id, true);
+            
+            // Get local media and create offer
+            getLocalMedia(currentCallType, false).then(() => {
+                createOffer(data.user_id);
+            }).catch(err => {
+                console.error('Error getting local media:', err);
+            });
+        }
+    });
+    
+    // Listen for call rejected
+    socket.on('call_rejected', (data) => {
+        console.log('Call rejected by', data.user_id);
+        if (currentCall && currentCall.callId === data.call_id) {
+            alert(`${data.user_name || 'User'} rejected the call`);
+            endCall();
+        }
+    });
+    
+    // Listen for call ended
+    socket.on('call_ended', (data) => {
+        console.log('Call ended', data);
+        endCall();
+    });
+    
+    // Listen for WebRTC signaling
     socket.on('call_offer', handleCallOffer);
     socket.on('call_answer', handleCallAnswer);
     socket.on('call_ice_candidate', handleIceCandidate);
-    socket.on('call_error', handleCallError);
-    socket.on('participant_joined', handleParticipantJoined);
-    socket.on('participant_left', handleParticipantLeft);
-}
-
-function initiateCall(userId, userName, type = 'video') {
-    if (currentCall) {
-        // If already in a call, add participant to existing call
-        addParticipantToCall(userId);
-        return;
-    }
     
-    currentCallType = type;
-    currentCall = {
-        callId: null,
-        participants: [{
-            id: CURRENT_USER_ID,
-            name: 'You',
-            isLocal: true
-        }, {
-            id: userId,
-            name: userName,
-            isLocal: false
-        }],
-        type: type,
-        isGroup: false
-    };
-    
-    // Show calling UI
-    showCallModal('outgoing', userName, type);
-    
-    // Request media
-    getLocalMedia(type).then(() => {
-        // Emit initiate call
-        socket.emit('initiate_call', {
-            callee_id: userId,
-            type: type
-        }, (response) => {
-            if (response && response.call_id) {
-                currentCall.callId = response.call_id;
-                // Don't create peer connection yet - wait for callee to accept
-                updateCallUI();
-            }
-        });
-    }).catch(err => {
-        console.error('Error getting local media:', err);
-        hideCallModal();
-        alert('Error accessing camera/microphone: ' + err.message);
-        currentCall = null;
-    });
-}
-
-function addParticipantToCall(userId) {
-    if (!currentCall || !currentCall.callId) return;
-    
-    socket.emit('add_participant', {
-        call_id: currentCall.callId,
-        user_id: userId
-    });
-}
-
-function handleIncomingCall(data) {
-    const { call_id, caller_id, caller_name, type, participants } = data;
-    
-    currentCall = {
-        callId: call_id,
-        participants: participants || [{
-            id: caller_id,
-            name: caller_name,
-            isLocal: false
-        }, {
-            id: CURRENT_USER_ID,
-            name: 'You',
-            isLocal: true
-        }],
-        type: type,
-        isGroup: (participants && participants.length > 2) || false
-    };
-    currentCallType = type;
-    
-    // Show incoming call UI
-    showCallModal('incoming', caller_name, type);
-    playRingtone();
-}
-
-function acceptCall() {
-    if (!currentCall || !currentCall.callId) {
-        return;
-    }
-    
-    const type = currentCall.type;
-    
-    // Get local media
-    getLocalMedia(type).then(() => {
-        // Accept call
-        socket.emit('accept_call', {
-            call_id: currentCall.callId
-        });
-        
-        // Update UI
-        updateCallModal('active', null, type);
-        updateCallUI();
-        stopRingtone();
-        
-        // Don't create peer connection here - wait for caller's offer
-        // The caller will create peer connection and send offer after receiving call_accepted
-    }).catch(err => {
-        console.error('Error getting local media:', err);
-        rejectCall();
-        alert('Error accessing camera/microphone: ' + err.message);
-    });
-}
-
-function rejectCall() {
-    if (!currentCall || !currentCall.callId) {
-        return;
-    }
-    
-    socket.emit('reject_call', {
-        call_id: currentCall.callId
-    });
-    
-    cleanupCall();
-}
-
-function endCall() {
-    if (!currentCall || !currentCall.callId) {
-        return;
-    }
-    
-    socket.emit('end_call', {
-        call_id: currentCall.callId
-    });
-    
-    cleanupCall();
-}
-
-function handleCallAccepted(data) {
-    if (!currentCall) return;
-    
-    const { call_id, callee_id, callee_name } = data;
-    
-    // Add participant to call
-    if (!currentCall.participants.find(p => p.id === callee_id)) {
-        currentCall.participants.push({
-            id: callee_id,
-            name: callee_name,
-            isLocal: false
-        });
-    }
-    
-    // Create peer connection with callee and send offer (caller side)
-    if (!peerConnections[callee_id]) {
-        createPeerConnection(callee_id, true);
-    }
-    
-    updateCallModal('active', null, currentCallType);
-    updateCallUI();
-}
-
-function handleCallRejected(data) {
-    cleanupCall();
-    alert('Call was rejected');
-}
-
-function handleCallEnded(data) {
-    cleanupCall();
-}
-
-function handleParticipantJoined(data) {
-    if (!currentCall) return;
-    
-    const { user_id, user_name } = data;
-    
-    // Add participant to call
-    if (!currentCall.participants.find(p => p.id === user_id)) {
-        currentCall.participants.push({
-            id: user_id,
-            name: user_name,
-            isLocal: false
-        });
-        currentCall.isGroup = currentCall.participants.length > 2;
-        
-        // Create peer connection and send offer to new participant
-        if (!peerConnections[user_id]) {
-            createPeerConnection(user_id, true);
+    // Listen for participant joining
+    socket.on('participant_joined', (data) => {
+        console.log('Participant joined:', data);
+        if (currentCall && currentCall.callId === data.call_id) {
+            currentCall.participants.push({ id: data.user_id, name: data.user_name || 'User', isLocal: false });
+            updateCallUI();
         }
-        
-        updateCallUI();
-    }
+    });
+    
+    // Listen for participant leaving
+    socket.on('participant_left', (data) => {
+        console.log('Participant left:', data);
+        if (currentCall && currentCall.callId === data.call_id) {
+            currentCall.participants = currentCall.participants.filter(p => p.id !== data.user_id);
+            if (peerConnections[data.user_id]) {
+                peerConnections[data.user_id].close();
+                delete peerConnections[data.user_id];
+            }
+            if (remoteStreams[data.user_id]) {
+                delete remoteStreams[data.user_id];
+            }
+            updateCallUI();
+        }
+    });
 }
 
-function handleParticipantLeft(data) {
-    if (!currentCall) return;
-    
-    const { user_id } = data;
-    
-    // Remove participant
-    currentCall.participants = currentCall.participants.filter(p => p.id !== user_id);
-    
-    // Close peer connection
-    if (peerConnections[user_id]) {
-        peerConnections[user_id].close();
-        delete peerConnections[user_id];
+async function initiateCall(userId, userName, type) {
+    if (currentCall) {
+        alert('You are already in a call');
+        return;
     }
     
-    // Remove remote stream
-    if (remoteStreams[user_id]) {
-        delete remoteStreams[user_id];
-    }
+    currentCallType = type;
+    currentCall = {
+        callId: `call_${Date.now()}_${CURRENT_USER_ID}`,
+        participants: [{ id: CURRENT_USER_ID, name: 'You', isLocal: true }],
+        type: type
+    };
     
-    updateCallUI();
-    
-    // If no other participants, end call
-    if (currentCall.participants.length === 1) {
+    // Get local media first
+    try {
+        await getLocalMedia(type, false);
+        showCallModal('calling', userName, type);
+        
+        // Emit call initiation
+        socket.emit('initiate_call', {
+            call_id: currentCall.callId,
+            user_id: userId,
+            type: type,
+            workspace_id: WORKSPACE_ID,
+            channel_id: CHANNEL_ID
+        });
+        
+        // Wait for call accepted before creating peer connection
+        // Peer connection will be created in 'call_accepted' handler
+    } catch (err) {
+        console.error('Error initiating call:', err);
+        alert('Error starting call: ' + err.message);
         endCall();
     }
 }
 
-function handleCallOffer(data) {
-    if (!currentCall) return;
-    
-    const { offer, from_user_id } = data;
-    
-    // Create peer connection if it doesn't exist
-    if (!peerConnections[from_user_id]) {
-        createPeerConnection(from_user_id, false);
-    }
-    
-    const pc = peerConnections[from_user_id];
-    
-    // Set remote description and create answer
-    pc.setRemoteDescription(new RTCSessionDescription(offer))
-        .then(() => {
-            return pc.createAnswer();
-        })
-        .then(answer => {
-            return pc.setLocalDescription(answer);
-        })
-        .then(() => {
-            socket.emit('call_answer', {
-                call_id: currentCall.callId,
-                to_user_id: from_user_id,
-                answer: pc.localDescription
-            });
-        })
-        .catch(err => {
-            console.error('Error handling offer:', err);
-        });
-}
-
-function handleCallAnswer(data) {
-    const { answer, from_user_id } = data;
-    
-    if (!peerConnections[from_user_id]) {
-        console.warn('Received answer but no peer connection for', from_user_id);
-        return;
-    }
-    
-    const pc = peerConnections[from_user_id];
-    pc.setRemoteDescription(new RTCSessionDescription(answer))
-        .catch(err => {
-            console.error('Error setting remote description:', err);
-        });
-}
-
-function handleIceCandidate(data) {
-    const { candidate, from_user_id } = data;
-    
-    if (!peerConnections[from_user_id]) return;
-    
-    const pc = peerConnections[from_user_id];
-    if (candidate) {
-        pc.addIceCandidate(new RTCIceCandidate(candidate))
-            .catch(err => {
-                console.error('Error adding ICE candidate:', err);
-            });
-    }
-}
-
-function handleCallError(data) {
-    cleanupCall();
-    alert(data.message || 'Call error occurred');
-}
-
-async function getLocalMedia(type) {
-    const constraints = {
-        audio: true,
-        video: type === 'video' ? {
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-        } : false
+function handleIncomingCall(data) {
+    console.log('Incoming call:', data);
+    currentCallType = data.type;
+    currentCall = {
+        callId: data.call_id,
+        participants: [{ id: data.caller_id, name: data.caller_name || 'User', isLocal: false }],
+        type: data.type
     };
     
+    showCallModal('incoming', data.caller_name, data.type);
+    playRingtone();
+}
+
+async function acceptCall() {
+    if (!currentCall) return;
+    
+    stopRingtone();
+    
     try {
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        localStream = stream;
+        await getLocalMedia(currentCallType, false);
         
-        // Process stream for background effects if video
-        if (type === 'video') {
-            await processLocalStream();
+        showCallModal('active', '', currentCallType);
+        
+        // Create peer connections for all existing participants
+        currentCall.participants.forEach(participant => {
+            if (!participant.isLocal) {
+                createPeerConnection(participant.id, false);
+            }
+        });
+        
+        // Accept call on server
+        socket.emit('accept_call', {
+            call_id: currentCall.callId
+        });
+        
+        // Create offers for all participants
+        currentCall.participants.forEach(participant => {
+            if (!participant.isLocal) {
+                createOffer(participant.id);
+            }
+        });
+    } catch (err) {
+        console.error('Error accepting call:', err);
+        alert('Error accepting call: ' + err.message);
+        endCall();
+    }
+}
+
+function rejectCall() {
+    if (!currentCall) return;
+    
+    stopRingtone();
+    socket.emit('reject_call', {
+        call_id: currentCall.callId
+    });
+    
+    endCall();
+}
+
+function endCall() {
+    if (isRecording) {
+        stopCallRecording();
+    }
+    
+    if (currentCall) {
+        socket.emit('end_call', {
+            call_id: currentCall.callId
+        });
+    }
+    
+    // Stop all media tracks
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+    
+    if (screenShareStream) {
+        screenShareStream.getTracks().forEach(track => track.stop());
+        screenShareStream = null;
+    }
+    
+    if (processedLocalStream) {
+        processedLocalStream.getTracks().forEach(track => track.stop());
+        processedLocalStream = null;
+    }
+    
+    // Close all peer connections
+    Object.values(peerConnections).forEach(pc => pc.close());
+    peerConnections = {};
+    remoteStreams = {};
+    
+    currentCall = null;
+    currentCallType = null;
+    isScreenSharing = false;
+    
+    hideCallModal();
+    stopRingtone();
+    
+    // Clear recording timer
+    if (recordingTimerInterval) {
+        clearInterval(recordingTimerInterval);
+        recordingTimerInterval = null;
+    }
+    recordingStartTime = null;
+    hideRecordingTimer();
+    
+    // Stop screen share if active
+    if (isScreenSharing) {
+        stopScreenShare();
+    }
+    
+    // Clean up audio elements
+    Object.values(remoteAudioElements).forEach(audio => {
+        audio.srcObject = null;
+        audio.remove();
+    });
+    remoteAudioElements = {};
+}
+
+async function getLocalMedia(type, screenShare) {
+    try {
+        const constraints = {
+            audio: true,
+            video: screenShare ? {
+                mediaSource: 'screen'
+            } : type === 'video' ? {
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                facingMode: 'user'
+            } : false
+        };
+        
+        let stream;
+        if (screenShare) {
+            stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
         } else {
-            processedLocalStream = stream;
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
         }
         
-        updateLocalVideo();
+        if (!screenShare) {
+            localStream = stream;
+            processedLocalStream = stream; // For now, no processing
+        }
+        
         return stream;
     } catch (err) {
         console.error('Error getting local media:', err);
@@ -358,46 +286,20 @@ async function getLocalMedia(type) {
     }
 }
 
-async function processLocalStream() {
-    if (!localStream) return;
-    
-    if (backgroundEffect === 'none') {
-        processedLocalStream = localStream;
-        updateLocalVideo();
-        updatePeerConnectionsTracks();
-        return;
-    }
-    
-    // For blur or background image, we'll use a simplified approach
-    // Note: Full background removal requires ML models or external libraries
-    // This is a placeholder that can be enhanced with libraries like BodyPix or MediaPipe
-    
-    if (backgroundEffect === 'blur') {
-        // Use CSS filter for blur (simplified approach)
-        // For real-time video blur, you'd need Canvas + filter or a WebGL shader
-        processedLocalStream = localStream;
-    } else if (backgroundEffect === 'image') {
-        // Virtual background with image
-        processedLocalStream = localStream;
-    }
-    
-    updateLocalVideo();
-    updatePeerConnectionsTracks();
+function processLocalStream(stream) {
+    // Apply background effects if needed
+    // For now, just return the stream
+    return stream;
 }
 
 function updatePeerConnectionsTracks() {
-    if (!processedLocalStream) return;
-    
+    const streamToUse = processedLocalStream || localStream;
     Object.keys(peerConnections).forEach(userId => {
         const pc = peerConnections[userId];
-        processedLocalStream.getTracks().forEach(track => {
-            const sender = pc.getSenders().find(s => 
-                s.track && s.track.kind === track.kind
-            );
+        streamToUse.getTracks().forEach(track => {
+            const sender = pc.getSenders().find(s => s.track && s.track.kind === track.kind);
             if (sender) {
                 sender.replaceTrack(track);
-            } else {
-                pc.addTrack(track, processedLocalStream);
             }
         });
     });
@@ -463,41 +365,89 @@ function createPeerConnection(userId, isCaller) {
     
     // Handle connection state changes
     pc.onconnectionstatechange = () => {
-        console.log(`Connection state with ${userId}:`, pc.connectionState);
+        console.log('Peer connection state changed:', userId, pc.connectionState);
         if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-            console.warn(`Connection with ${userId} failed or disconnected`);
+            console.warn('Peer connection failed or disconnected:', userId);
         }
     };
     
-    // Handle ICE connection state
-    pc.oniceconnectionstatechange = () => {
-        console.log(`ICE connection state with ${userId}:`, pc.iceConnectionState);
-    };
-    
-    // Create offer if caller
-    if (isCaller) {
-        pc.createOffer({
-            offerToReceiveAudio: true,
-            offerToReceiveVideo: currentCallType === 'video'
-        })
-            .then(offer => {
-                console.log('Created offer for', userId);
-                return pc.setLocalDescription(offer);
-            })
-            .then(() => {
-                socket.emit('call_offer', {
-                    call_id: currentCall.callId,
-                    to_user_id: userId,
-                    offer: pc.localDescription
-                });
-                console.log('Sent offer to', userId);
-            })
-            .catch(err => {
-                console.error('Error creating offer:', err);
-            });
+    return pc;
+}
+
+async function createOffer(userId) {
+    const pc = peerConnections[userId];
+    if (!pc) {
+        console.error('No peer connection for', userId);
+        return;
     }
     
-    return pc;
+    try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        
+        socket.emit('call_offer', {
+            call_id: currentCall.callId,
+            to_user_id: userId,
+            offer: offer
+        });
+    } catch (err) {
+        console.error('Error creating offer:', err);
+    }
+}
+
+async function handleCallOffer(data) {
+    const userId = data.from_user_id;
+    
+    if (!peerConnections[userId]) {
+        createPeerConnection(userId, false);
+    }
+    
+    const pc = peerConnections[userId];
+    try {
+        await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        
+        socket.emit('call_answer', {
+            call_id: currentCall.callId,
+            to_user_id: userId,
+            answer: answer
+        });
+    } catch (err) {
+        console.error('Error handling offer:', err);
+    }
+}
+
+async function handleCallAnswer(data) {
+    const userId = data.from_user_id;
+    const pc = peerConnections[userId];
+    
+    if (!pc) {
+        console.error('No peer connection for', userId);
+        return;
+    }
+    
+    try {
+        await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+    } catch (err) {
+        console.error('Error handling answer:', err);
+    }
+}
+
+function handleIceCandidate(data) {
+    const userId = data.from_user_id;
+    const pc = peerConnections[userId];
+    
+    if (!pc) {
+        console.error('No peer connection for', userId);
+        return;
+    }
+    
+    try {
+        pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+    } catch (err) {
+        console.error('Error adding ICE candidate:', err);
+    }
 }
 
 async function startScreenShare() {
@@ -561,7 +511,7 @@ function stopScreenShare() {
     
     // Ensure modal is not minimized after stopping screen share
     if (isCallModalMinimized) {
-        toggleCallModalMinimize(); // Restore to full size
+        toggleCallModalMinimize();
     }
 }
 
@@ -570,149 +520,47 @@ function startCallRecording() {
     
     console.log('Starting recording...');
     
-    // Get or create a container for recording video elements
-    // Note: Container must be in viewport (even if tiny) for canvas capture to work in some browsers
-    let recordingContainer = document.getElementById('recordingVideoContainer');
-    if (!recordingContainer) {
-        recordingContainer = document.createElement('div');
-        recordingContainer.id = 'recordingVideoContainer';
-        // Position in viewport but make it tiny and clip it - required for canvas capture
-        recordingContainer.style.cssText = 'position: fixed; top: 0; left: 0; width: 1280px; height: 720px; z-index: -9999; opacity: 1; pointer-events: none; background: #000; visibility: visible; clip-path: inset(100% 100% 0 0); overflow: hidden;';
-        document.body.appendChild(recordingContainer);
-    } else {
-        // Make sure container is in viewport but clipped
-        recordingContainer.style.top = '0';
-        recordingContainer.style.left = '0';
-        recordingContainer.style.opacity = '1';
-        recordingContainer.style.visibility = 'visible';
-        recordingContainer.style.zIndex = '-9999';
-        recordingContainer.style.clipPath = 'inset(100% 100% 0 0)';
-        recordingContainer.style.overflow = 'hidden';
+    // Use existing video elements from the call UI - they're already visible and playing
+    const videoElements = {};
+    
+    // Get local video element from call UI
+    const localVideoEl = document.getElementById('localVideo');
+    if (localVideoEl && localVideoEl.srcObject) {
+        videoElements.local = localVideoEl;
+        console.log('Using existing local video element');
     }
     
-    // Create canvas for compositing all streams
+    // Get remote video elements from call UI
+    Object.keys(remoteStreams).forEach(userId => {
+        const remoteVideoEl = document.getElementById(`remoteVideoStream-${userId}`);
+        if (remoteVideoEl && remoteVideoEl.srcObject) {
+            videoElements[userId] = remoteVideoEl;
+            console.log('Using existing remote video element for', userId);
+        }
+    });
+    
+    const videoCount = Object.keys(videoElements).length;
+    if (videoCount === 0) {
+        console.error('No video elements found in call UI');
+        alert('Cannot start recording: No video streams available');
+        return;
+    }
+    
+    console.log('Using', videoCount, 'existing video elements for recording');
+    
+    // Create a small visible canvas for compositing (must be in viewport for captureStream to work)
     recordingCanvas = document.createElement('canvas');
     recordingCanvas.width = 1280;
     recordingCanvas.height = 720;
     recordingContext = recordingCanvas.getContext('2d');
-    recordingCanvas.style.cssText = 'position: absolute; top: 0; left: 0;';
-    recordingContainer.appendChild(recordingCanvas);
     
-    const videoElements = {};
-    const createdVideoElements = [];
+    // Position canvas in viewport but make it very small (1x1px) and transparent
+    recordingCanvas.style.cssText = 'position: fixed; top: 0; right: 0; width: 1px; height: 1px; opacity: 0.01; z-index: 999999; pointer-events: none;';
+    document.body.appendChild(recordingCanvas);
     
-    // Get local stream
-    const localStreamToUse = isScreenSharing ? screenShareStream : (processedLocalStream || localStream);
-    if (!localStreamToUse) {
-        console.error('No local stream available for recording');
-        alert('Cannot start recording: No video stream available');
-        return;
-    }
-    
-    // Create local video element for recording
-    const localVideo = document.createElement('video');
-    localVideo.srcObject = localStreamToUse;
-    localVideo.muted = true; // Mute local video to avoid echo
-    localVideo.autoplay = true;
-    localVideo.playsInline = true;
-    localVideo.setAttribute('playsinline', 'true');
-    localVideo.width = 640;
-    localVideo.height = 480;
-    localVideo.style.cssText = 'position: absolute; top: 0; left: 0; width: 640px; height: 480px; object-fit: cover; background: #000;';
-    recordingContainer.appendChild(localVideo);
-    videoElements.local = localVideo;
-    createdVideoElements.push(localVideo);
-    
-    // Create remote video elements
-    Object.keys(remoteStreams).forEach(userId => {
-        const remoteVideo = document.createElement('video');
-        remoteVideo.srcObject = remoteStreams[userId];
-        remoteVideo.muted = false;
-        remoteVideo.autoplay = true;
-        remoteVideo.playsInline = true;
-        remoteVideo.setAttribute('playsinline', 'true');
-        remoteVideo.width = 640;
-        remoteVideo.height = 480;
-        
-        // Position based on number of streams
-        const remoteIndex = Object.keys(videoElements).length;
-        const totalStreams = Object.keys(remoteStreams).length + 1; // +1 for local
-        
-        if (totalStreams === 1) {
-            remoteVideo.style.cssText = 'position: absolute; top: 0; left: 0; width: 1280px; height: 720px; object-fit: cover; background: #000;';
-        } else if (totalStreams === 2) {
-            remoteVideo.style.cssText = `position: absolute; top: 0; left: ${remoteIndex === 1 ? '640px' : '0'}; width: 640px; height: 720px; object-fit: cover; background: #000;`;
-        } else {
-            const cols = Math.ceil(Math.sqrt(totalStreams));
-            const col = remoteIndex % cols;
-            const row = Math.floor(remoteIndex / cols);
-            const cellWidth = 1280 / cols;
-            const cellHeight = 720 / Math.ceil(totalStreams / cols);
-            remoteVideo.style.cssText = `position: absolute; top: ${row * cellHeight}px; left: ${col * cellWidth}px; width: ${cellWidth}px; height: ${cellHeight}px; object-fit: cover; background: #000;`;
-        }
-        
-        recordingContainer.appendChild(remoteVideo);
-        videoElements[userId] = remoteVideo;
-        createdVideoElements.push(remoteVideo);
-    });
-    
-    console.log('Created', Object.keys(videoElements).length, 'video elements for recording');
-    
-    // Position local video based on total count
-    const totalStreams = Object.keys(videoElements).length;
-    if (totalStreams === 1) {
-        localVideo.style.cssText = 'position: absolute; top: 0; left: 0; width: 1280px; height: 720px;';
-    } else if (totalStreams === 2) {
-        localVideo.style.cssText = 'position: absolute; top: 0; left: 0; width: 640px; height: 720px;';
-    } else {
-        const cols = Math.ceil(Math.sqrt(totalStreams));
-        const cellWidth = 1280 / cols;
-        const cellHeight = 720 / Math.ceil(totalStreams / cols);
-        localVideo.style.cssText = `position: absolute; top: 0; left: 0; width: ${cellWidth}px; height: ${cellHeight}px;`;
-    }
-    
-    // Wait for all videos to be ready and playing
-    const videoPromises = Object.entries(videoElements).map(([key, video]) => {
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                reject(new Error(`Timeout waiting for video: ${key}`));
-            }, 5000);
-            
-            const checkReady = () => {
-                if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-                    clearTimeout(timeout);
-                    console.log(`Video ready for recording: ${key}`, video.videoWidth, 'x', video.videoHeight);
-                    resolve();
-                } else {
-                    requestAnimationFrame(checkReady);
-                }
-            };
-            
-            video.addEventListener('loadedmetadata', () => {
-                video.play().then(() => {
-                    setTimeout(checkReady, 100);
-                }).catch(err => {
-                    console.warn('Error playing video for recording:', key, err);
-                    setTimeout(checkReady, 100);
-                });
-            }, { once: true });
-            
-            // If already has metadata, check immediately
-            if (video.readyState >= 1) {
-                video.play().then(() => {
-                    setTimeout(checkReady, 100);
-                }).catch(err => {
-                    console.warn('Error playing video for recording:', key, err);
-                    setTimeout(checkReady, 100);
-                });
-            }
-        });
-    });
-    
-    Promise.all(videoPromises).then(() => {
-        console.log('All videos ready, starting canvas drawing and MediaRecorder');
-        
-        // Start drawing loop
+    // Wait a moment for canvas to be in DOM
+    setTimeout(() => {
+        // Start drawing loop to composite videos onto canvas
         function drawFrame() {
             if (!isRecording) return;
             
@@ -785,7 +633,8 @@ function startCallRecording() {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const destination = audioContext.createMediaStreamDestination();
         
-        // Add local audio
+        // Get local stream for audio
+        const localStreamToUse = isScreenSharing ? screenShareStream : (processedLocalStream || localStream);
         if (localStreamToUse && localStreamToUse.getAudioTracks().length > 0) {
             const localAudioSource = audioContext.createMediaStreamSource(localStreamToUse);
             localAudioSource.connect(destination);
@@ -832,25 +681,12 @@ function startCallRecording() {
                 cancelAnimationFrame(recordingAnimationFrame);
             }
             
-            // Clean up video elements
-            createdVideoElements.forEach(video => {
-                video.srcObject = null;
-                video.remove();
-            });
-            
-            // Clean up canvas and container
-            if (recordingCanvas) {
-                recordingCanvas.remove();
-                recordingCanvas = null;
-                recordingContext = null;
+            // Clean up canvas
+            if (recordingCanvas && recordingCanvas.parentNode) {
+                recordingCanvas.parentNode.removeChild(recordingCanvas);
             }
-            
-            // Clean up recording container (keep it for next recording but clip it)
-            const recordingContainer = document.getElementById('recordingVideoContainer');
-            if (recordingContainer) {
-                recordingContainer.style.clipPath = 'inset(100% 100% 0 0)';
-                recordingContainer.style.opacity = '0';
-            }
+            recordingCanvas = null;
+            recordingContext = null;
             
             // Close audio context
             if (audioContext) {
@@ -866,19 +702,12 @@ function startCallRecording() {
         window.isRecordingCall = true;
         recordingStartTime = Date.now();
         updateRecordButton(true);
-        updateRecordingTimer();
+        if (!recordingTimerInterval) {
+            recordingTimerInterval = setInterval(updateRecordingTimer, 1000);
+        }
         showRecordingTimer();
-        console.log('Recording started with', count, 'streams');
-    }).catch(err => {
-        console.error('Error preparing recording:', err);
-        alert('Error starting recording: ' + err.message);
-        // Clean up on error
-        createdVideoElements.forEach(video => video.remove());
-        if (recordingCanvas) recordingCanvas.remove();
-        recordingCanvas = null;
-        recordingContext = null;
-        updateRecordButton(false);
-    });
+        console.log('Recording started with', videoCount, 'streams');
+    }, 100);
 }
 
 function stopCallRecording() {
@@ -909,6 +738,10 @@ function stopCallRecording() {
 
 function updateRecordingTimer() {
     if (!isRecording || !recordingStartTime) {
+        if (recordingTimerInterval) {
+            clearInterval(recordingTimerInterval);
+            recordingTimerInterval = null;
+        }
         hideRecordingTimer();
         return;
     }
@@ -920,11 +753,6 @@ function updateRecordingTimer() {
     const timerElement = document.getElementById('callRecordingTime');
     if (timerElement) {
         timerElement.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    }
-    
-    // Start interval if not already running
-    if (!recordingTimerInterval) {
-        recordingTimerInterval = setInterval(updateRecordingTimer, 1000);
     }
 }
 
@@ -940,17 +768,13 @@ function hideRecordingTimer() {
     if (timerContainer) {
         timerContainer.classList.add('hidden');
     }
-    const timerElement = document.getElementById('callRecordingTime');
-    if (timerElement) {
-        timerElement.textContent = '00:00';
-    }
 }
 
 async function downloadRecordingAsZip(videoBlob) {
     try {
+        // Check if JSZip is available
         if (typeof JSZip === 'undefined') {
-            // Fallback to direct download if JSZip is not available
-            console.warn('JSZip not available, downloading video directly');
+            // Fallback: Direct download
             const url = URL.createObjectURL(videoBlob);
             const a = document.createElement('a');
             a.href = url;
@@ -963,8 +787,7 @@ async function downloadRecordingAsZip(videoBlob) {
         }
         
         const zip = new JSZip();
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0] + '_' + Date.now();
-        const folderName = `call-recording-${timestamp}`;
+        const folderName = `call-recording-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)}`;
         
         // Add video file to zip (using .webm extension - VLC supports WebM)
         const videoFileName = `${folderName}.webm`;
@@ -994,25 +817,21 @@ Compatible with: VLC Media Player, Chrome, Firefox, Edge, and most modern video 
         
         zip.file('RECORDING_INFO.txt', infoContent);
         
-        // Generate zip file
+        // Generate and download ZIP
         const zipBlob = await zip.generateAsync({ type: 'blob' });
-        const zipUrl = URL.createObjectURL(zipBlob);
-        
-        // Download zip file
+        const url = URL.createObjectURL(zipBlob);
         const a = document.createElement('a');
-        a.href = zipUrl;
+        a.href = url;
         a.download = `${folderName}.zip`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        URL.revokeObjectURL(url);
         
-        // Clean up
-        URL.revokeObjectURL(zipUrl);
-        
-        console.log('Recording downloaded as ZIP file');
-    } catch (error) {
-        console.error('Error creating ZIP file:', error);
-        // Fallback to direct download
+        console.log('Recording downloaded as ZIP');
+    } catch (err) {
+        console.error('Error downloading recording:', err);
+        // Fallback: Direct download
         const url = URL.createObjectURL(videoBlob);
         const a = document.createElement('a');
         a.href = url;
@@ -1024,98 +843,181 @@ Compatible with: VLC Media Player, Chrome, Firefox, Edge, and most modern video 
     }
 }
 
-function downloadRecording(url) {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `call-recording-${Date.now()}.webm`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+function toggleMute() {
+    if (!localStream) return;
+    
+    const audioTracks = localStream.getAudioTracks();
+    audioTracks.forEach(track => {
+        track.enabled = !track.enabled;
+    });
+    
+    const muteBtn = document.getElementById('muteBtn');
+    if (muteBtn) {
+        if (audioTracks[0] && audioTracks[0].enabled) {
+            muteBtn.innerHTML = '<i class="fas fa-microphone text-lg"></i>';
+            muteBtn.title = 'Mute';
+        } else {
+            muteBtn.innerHTML = '<i class="fas fa-microphone-slash text-lg"></i>';
+            muteBtn.title = 'Unmute';
+        }
+    }
 }
 
-function cleanupCall() {
-    // Stop recording if active
-    if (isRecording) {
-        stopCallRecording();
-    }
+function toggleVideo() {
+    if (!localStream) return;
     
-    // Clear recording timer
-    if (recordingTimerInterval) {
-        clearInterval(recordingTimerInterval);
-        recordingTimerInterval = null;
-    }
-    recordingStartTime = null;
-    hideRecordingTimer();
+    const videoTracks = localStream.getVideoTracks();
+    videoTracks.forEach(track => {
+        track.enabled = !track.enabled;
+    });
     
-    // Stop screen share if active
+    const videoBtn = document.getElementById('videoBtn');
+    if (videoBtn) {
+        if (videoTracks[0] && videoTracks[0].enabled) {
+            videoBtn.innerHTML = '<i class="fas fa-video text-lg"></i>';
+            videoBtn.title = 'Turn off camera';
+        } else {
+            videoBtn.innerHTML = '<i class="fas fa-video-slash text-lg"></i>';
+            videoBtn.title = 'Turn on camera';
+        }
+    }
+}
+
+function toggleScreenShare() {
     if (isScreenSharing) {
         stopScreenShare();
+    } else {
+        startScreenShare();
+    }
+}
+
+function updateScreenShareButton(isSharing) {
+    const screenShareBtn = document.getElementById('screenShareBtn');
+    if (screenShareBtn) {
+        if (isSharing) {
+            screenShareBtn.classList.add('bg-purple-500');
+            screenShareBtn.classList.remove('bg-gray-600');
+            screenShareBtn.title = 'Stop sharing screen';
+        } else {
+            screenShareBtn.classList.remove('bg-purple-500');
+            screenShareBtn.classList.add('bg-gray-600');
+            screenShareBtn.title = 'Share screen';
+        }
+    }
+}
+
+function updateRecordButton(isRecordingState) {
+    const recordBtn = document.getElementById('callRecordBtn');
+    if (recordBtn) {
+        if (isRecordingState) {
+            recordBtn.classList.remove('bg-gray-500');
+            recordBtn.classList.add('bg-red-500');
+            recordBtn.title = 'Stop recording';
+        } else {
+            recordBtn.classList.remove('bg-red-500');
+            recordBtn.classList.add('bg-gray-500');
+            recordBtn.title = 'Start recording';
+        }
+    }
+}
+
+function toggleCallModalMinimize() {
+    const modal = document.getElementById('callModal');
+    const modalContent = document.getElementById('callModalContent');
+    
+    if (!modal || !modalContent) return;
+    
+    isCallModalMinimized = !isCallModalMinimized;
+    
+    if (isCallModalMinimized) {
+        modalContent.classList.add('w-96', 'h-auto', 'max-w-none');
+        modalContent.classList.remove('max-w-7xl');
+        modal.style.alignItems = 'flex-end';
+        modal.style.justifyContent = 'flex-end';
+        modal.style.padding = '1rem';
+    } else {
+        modalContent.classList.remove('w-96', 'h-auto', 'max-w-none');
+        modalContent.classList.add('max-w-7xl');
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        modal.style.padding = '0';
+    }
+}
+
+function showCallModal(state, userName, type) {
+    const modal = document.getElementById('callModal');
+    const title = document.getElementById('callTitle');
+    const status = document.getElementById('callStatus');
+    
+    if (!modal) return;
+    
+    modal.classList.remove('hidden');
+    
+    if (state === 'calling') {
+        title.textContent = `Calling ${userName}...`;
+        status.textContent = 'Waiting for answer...';
+    } else if (state === 'incoming') {
+        title.textContent = `Incoming ${type === 'video' ? 'Video' : 'Audio'} Call`;
+        status.textContent = `${userName} is calling you...`;
+    } else if (state === 'active') {
+        title.textContent = `${type === 'video' ? 'Video' : 'Audio'} Call`;
+        status.textContent = 'Connected';
+        updateCallUI();
     }
     
-    // Clean up audio elements
-    Object.values(remoteAudioElements).forEach(audio => {
-        audio.srcObject = null;
-        audio.remove();
-    });
-    remoteAudioElements = {};
+    updateCallButtons();
+}
+
+function hideCallModal() {
+    const modal = document.getElementById('callModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+function updateCallButtons() {
+    const acceptBtn = document.getElementById('acceptCallBtn');
+    const rejectBtn = document.getElementById('rejectCallBtn');
+    const endBtn = document.getElementById('endCallBtn');
+    const muteBtn = document.getElementById('muteBtn');
+    const videoBtn = document.getElementById('videoBtn');
+    const screenShareBtn = document.getElementById('screenShareBtn');
+    const recordBtn = document.getElementById('callRecordBtn');
+    const minimizeBtn = document.getElementById('minimizeCallBtn');
+    const addParticipantBtn = document.getElementById('addParticipantBtn');
     
-    // Reset minimized state
-    isCallModalMinimized = false;
-    
-    // Stop local stream
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
+    if (!currentCall) {
+        if (acceptBtn) acceptBtn.classList.add('hidden');
+        if (rejectBtn) rejectBtn.classList.add('hidden');
+        if (endBtn) endBtn.classList.add('hidden');
+        if (muteBtn) muteBtn.classList.add('hidden');
+        if (videoBtn) videoBtn.classList.add('hidden');
+        if (screenShareBtn) screenShareBtn.classList.add('hidden');
+        if (recordBtn) recordBtn.classList.add('hidden');
+        if (minimizeBtn) minimizeBtn.classList.add('hidden');
+        if (addParticipantBtn) addParticipantBtn.classList.add('hidden');
+        return;
     }
     
-    if (processedLocalStream && processedLocalStream !== localStream) {
-        processedLocalStream.getTracks().forEach(track => track.stop());
-        processedLocalStream = null;
-    }
+    const isActive = currentCall && currentCall.callId;
+    const isIncoming = currentCall && !isActive;
     
-    // Cleanup background canvas
-    if (backgroundCanvas) {
-        backgroundCanvas = null;
-        backgroundContext = null;
-        backgroundVideo = null;
-    }
-    
-    // Close all peer connections
-    Object.values(peerConnections).forEach(pc => pc.close());
-    peerConnections = {};
-    
-    // Clear remote streams
-    remoteStreams = {};
-    
-    // Clear call state
-    currentCall = null;
-    currentCallType = null;
-    backgroundEffect = 'none';
-    backgroundImage = null;
-    
-    // Hide modal
-    hideCallModal();
-    stopRingtone();
+    if (acceptBtn) acceptBtn.classList.toggle('hidden', !isIncoming);
+    if (rejectBtn) rejectBtn.classList.toggle('hidden', !isIncoming);
+    if (endBtn) endBtn.classList.toggle('hidden', !isActive);
+    if (muteBtn) muteBtn.classList.toggle('hidden', !isActive || currentCallType === 'audio');
+    if (videoBtn) videoBtn.classList.toggle('hidden', !isActive || currentCallType === 'audio');
+    if (screenShareBtn) screenShareBtn.classList.toggle('hidden', !isActive || currentCallType === 'audio');
+    if (recordBtn) recordBtn.classList.toggle('hidden', !isActive);
+    if (minimizeBtn) minimizeBtn.classList.toggle('hidden', !isActive);
+    if (addParticipantBtn) addParticipantBtn.classList.toggle('hidden', !isActive);
 }
 
 function updateCallUI() {
-    if (!currentCall) return;
+    const videoGrid = document.getElementById('videoGrid');
+    if (!videoGrid) return;
     
-    // Update participants list
-    const participantsDiv = document.getElementById('callParticipants');
-    if (participantsDiv) {
-        participantsDiv.innerHTML = '';
-        currentCall.participants.forEach(participant => {
-            const div = document.createElement('div');
-            div.className = 'text-white text-sm';
-            div.textContent = participant.name;
-            participantsDiv.appendChild(div);
-        });
-    }
-    
-    // Update video/audio grid
-    if (currentCall.type === 'video') {
+    if (currentCallType === 'video') {
         updateVideoGrid();
     } else {
         updateAudioCallUI();
@@ -1268,102 +1170,27 @@ function updateRemoteVideo(userId, stream) {
     }
 }
 
-function showCallModal(state, userName, type) {
-    const modal = document.getElementById('callModal');
-    if (!modal) return;
-    
-    modal.classList.remove('hidden');
-    
-    const title = document.getElementById('callTitle');
-    const status = document.getElementById('callStatus');
-    
-    if (title) {
-        title.textContent = userName || 'Call';
-    }
-    
-    if (state === 'incoming') {
-        if (status) status.textContent = `Incoming ${type} call`;
-    } else if (state === 'outgoing') {
-        if (status) status.textContent = `Calling...`;
-    } else if (state === 'active') {
-        if (status) status.textContent = `${type} call in progress`;
-    }
-    
-    updateCallButtons(state);
-    updateCallUI();
+function playRingtone() {
+    // Simple ringtone implementation - could be enhanced
+    console.log('Playing ringtone');
 }
 
-function updateCallModal(state, userName, type) {
-    showCallModal(state, userName, type);
-}
-
-function updateCallButtons(state) {
-    const acceptBtn = document.getElementById('acceptCallBtn');
-    const rejectBtn = document.getElementById('rejectCallBtn');
-    const endCallBtn = document.getElementById('endCallBtn');
-    const blurBtn = document.getElementById('blurBackgroundBtn');
-    const videoBtn = document.getElementById('videoBtn');
-    const screenShareBtn = document.getElementById('screenShareBtn');
-    
-    if (state === 'incoming') {
-        if (acceptBtn) acceptBtn.classList.remove('hidden');
-        if (rejectBtn) rejectBtn.classList.remove('hidden');
-        if (endCallBtn) endCallBtn.classList.add('hidden');
-        if (blurBtn) blurBtn.style.display = 'none';
-        if (videoBtn) videoBtn.style.display = 'none';
-        if (screenShareBtn) screenShareBtn.style.display = 'none';
-    } else if (state === 'outgoing') {
-        if (acceptBtn) acceptBtn.classList.add('hidden');
-        if (rejectBtn) rejectBtn.classList.remove('hidden');
-        if (endCallBtn) endCallBtn.classList.add('hidden');
-        if (blurBtn) blurBtn.style.display = 'none';
-        if (videoBtn) videoBtn.style.display = 'none';
-        if (addParticipantBtn) addParticipantBtn.style.display = 'none';
-        if (screenShareBtn) screenShareBtn.style.display = 'none';
-    } else if (state === 'active') {
-        if (acceptBtn) acceptBtn.classList.add('hidden');
-        if (rejectBtn) rejectBtn.classList.add('hidden');
-        if (endCallBtn) endCallBtn.classList.remove('hidden');
-        // Show blur button only for video calls
-        if (blurBtn) blurBtn.style.display = currentCallType === 'video' ? 'flex' : 'none';
-        if (videoBtn) videoBtn.style.display = currentCallType === 'video' ? 'flex' : 'none';
-        if (screenShareBtn) screenShareBtn.style.display = currentCallType === 'video' ? 'flex' : 'none';
-        if (addParticipantBtn) addParticipantBtn.style.display = 'flex';
-    }
-}
-
-function hideCallModal() {
-    const modal = document.getElementById('callModal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
+function stopRingtone() {
+    console.log('Stopping ringtone');
 }
 
 function showAddParticipantModal() {
-    if (!currentCall || !currentCall.callId) return;
-    
     const modal = document.getElementById('addParticipantModal');
     if (!modal) return;
     
-    // Add click handlers to participant cards
-    const cards = modal.querySelectorAll('.participant-card');
-    cards.forEach(card => {
-        card.onclick = function() {
-            const userId = parseInt(this.getAttribute('data-user-id'));
-            const userName = this.getAttribute('data-user-name');
-            
-            // Check if user is already in call
-            if (currentCall.participants.find(p => p.id === userId)) {
-                alert(userName + ' is already in the call');
-                return;
-            }
-            
-            // Add participant
-            addParticipantToCall(userId);
-            hideAddParticipantModal();
-        };
-    });
+    // Get workspace members (should be available from template)
+    const membersList = document.getElementById('addParticipantMembersList');
+    if (!membersList) return;
     
+    // Filter out current participants
+    const currentParticipantIds = currentCall ? currentCall.participants.map(p => p.id) : [];
+    
+    // Members list should be populated from template
     modal.classList.remove('hidden');
 }
 
@@ -1374,130 +1201,20 @@ function hideAddParticipantModal() {
     }
 }
 
-function toggleCallModalMinimize() {
-    const modal = document.getElementById('callModal');
-    const content = document.getElementById('callModalContent');
-    const icon = document.getElementById('minimizeIcon');
+function addParticipantToCall(userId) {
+    if (!currentCall) return;
     
-    if (!modal || !content) return;
+    socket.emit('add_participant', {
+        call_id: currentCall.callId,
+        user_id: userId
+    });
     
-    isCallModalMinimized = !isCallModalMinimized;
-    
-    if (isCallModalMinimized) {
-        // Minimize - make it a small floating window
-        modal.classList.remove('items-center', 'justify-center');
-        modal.style.alignItems = 'flex-end';
-        modal.style.justifyContent = 'flex-end';
-        modal.style.padding = '20px';
-        content.style.maxWidth = '400px';
-        content.style.width = 'auto';
-        content.style.height = 'auto';
-        content.style.maxHeight = '300px';
-        content.style.overflow = 'auto';
-        if (icon) icon.className = 'fas fa-window-restore text-lg';
-    } else {
-        // Maximize - restore to full size
-        modal.classList.add('items-center', 'justify-center');
-        modal.style.alignItems = '';
-        modal.style.justifyContent = '';
-        modal.style.padding = '';
-        content.style.maxWidth = 'max-w-7xl';
-        content.style.width = 'w-full';
-        content.style.height = '';
-        content.style.maxHeight = '';
-        content.style.overflow = '';
-        if (icon) icon.className = 'fas fa-window-minimize text-lg';
-    }
-    
-    // Update UI to reflect changes
-    updateCallUI();
-}
-
-function playRingtone() {
-    // Optional: Add ringtone
-}
-
-function stopRingtone() {
-    // Stop ringtone if playing
-}
-
-function toggleMute() {
-    if (localStream) {
-        const audioTracks = localStream.getAudioTracks();
-        audioTracks.forEach(track => {
-            track.enabled = !track.enabled;
-        });
-        
-        const muteBtn = document.getElementById('muteBtn');
-        if (muteBtn) {
-            muteBtn.classList.toggle('bg-red-500', !audioTracks[0]?.enabled);
-        }
-    }
-}
-
-function toggleVideo() {
-    if (localStream) {
-        const videoTracks = localStream.getVideoTracks();
-        videoTracks.forEach(track => {
-            track.enabled = !track.enabled;
-        });
-        
-        const videoBtn = document.getElementById('videoBtn');
-        if (videoBtn) {
-            videoBtn.classList.toggle('bg-red-500', !videoTracks[0]?.enabled);
-        }
-    }
+    hideAddParticipantModal();
 }
 
 function toggleBackgroundBlur() {
-    if (currentCallType !== 'video') return;
+    if (isScreenSharing) return;
     
-    if (backgroundEffect === 'blur') {
-        backgroundEffect = 'none';
-    } else {
-        backgroundEffect = 'blur';
-    }
-    
-    processLocalStream();
-    
-    const blurBtn = document.getElementById('blurBackgroundBtn');
-    if (blurBtn) {
-        blurBtn.classList.toggle('bg-green-500', backgroundEffect === 'blur');
-        blurBtn.classList.toggle('bg-white/20', backgroundEffect !== 'blur');
-    }
-}
-
-function setBackgroundImage(file) {
-    if (currentCallType !== 'video') return;
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        backgroundImage = e.target.result;
-        backgroundEffect = 'image';
-        processLocalStream();
-    };
-    reader.readAsDataURL(file);
-}
-
-function updateScreenShareButton(isSharing) {
-    const screenShareBtn = document.getElementById('screenShareBtn');
-    if (screenShareBtn) {
-        screenShareBtn.classList.toggle('bg-green-500', isSharing);
-        screenShareBtn.classList.toggle('bg-purple-500', !isSharing);
-    }
-}
-
-function updateRecordButton(isRecordingState) {
-    const recordBtn = document.getElementById('callRecordBtn');
-    if (recordBtn) {
-        if (isRecordingState) {
-            recordBtn.classList.remove('bg-gray-500', 'hover:bg-gray-600');
-            recordBtn.classList.add('bg-red-500', 'hover:bg-red-600');
-            recordBtn.title = 'Stop Recording';
-        } else {
-            recordBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
-            recordBtn.classList.add('bg-gray-500', 'hover:bg-gray-600');
-            recordBtn.title = 'Record Call';
-        }
-    }
+    backgroundEffect = backgroundEffect === 'blur' ? 'none' : 'blur';
+    updateLocalVideo();
 }
