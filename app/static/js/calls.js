@@ -35,6 +35,21 @@ function initCalls() {
     // Listen for incoming calls
     socket.on('incoming_call', handleIncomingCall);
     
+    // Listen for call initiated (response from server with call_id)
+    socket.on('call_initiated', (data) => {
+        console.log('Call initiated, call_id:', data.call_id);
+        if (currentCall) {
+            currentCall.callId = data.call_id;
+        }
+    });
+    
+    // Listen for call errors
+    socket.on('call_error', (data) => {
+        console.error('Call error:', data.message);
+        alert(data.message || 'Call error occurred');
+        endCall();
+    });
+    
     // Listen for call accepted
     socket.on('call_accepted', (data) => {
         console.log('Call accepted by', data.user_id);
@@ -119,11 +134,8 @@ async function initiateCall(userId, userName, type) {
         
         // Emit call initiation
         socket.emit('initiate_call', {
-            call_id: currentCall.callId,
-            user_id: userId,
-            type: type,
-            workspace_id: WORKSPACE_ID,
-            channel_id: CHANNEL_ID
+            callee_id: userId,
+            type: type
         });
         
         // Wait for call accepted before creating peer connection

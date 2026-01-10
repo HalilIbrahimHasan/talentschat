@@ -395,6 +395,12 @@ def on_initiate_call(data):
         'participants': [{'id': current_user.id, 'name': current_user.name}]
     }, room=callee_socket_id)
     
+    # Also emit call_id back to caller so they can use the backend-generated ID
+    emit('call_initiated', {
+        'call_id': call_id,
+        'callee_id': callee_id
+    })
+    
     return {'call_id': call_id}
 
 
