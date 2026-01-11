@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}{% if challenge %}Edit Coding Challenge{% else %}Create Coding Challenge{% endif %}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-8">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="bg-white rounded-2xl shadow-lg p-8">
+            <h1 class="text-3xl font-bold text-gray-900 mb-6">
+                {% if challenge %}Edit Coding Challenge{% else %}Create Coding Challenge{% endif %}
+            </h1>
+            
+            <form method="POST" class="space-y-6">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="title" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Title <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="title" name="title" required
+                               value="{{ challenge.title if challenge else '' }}"
+                               class="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    
+                    <div>
+                        <label for="difficulty" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Difficulty
+                        </label>
+                        <select id="difficulty" name="difficulty"
+                                class="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="easy" {% if challenge and challenge.difficulty == 'easy' %}selected{% endif %}>Easy</option>
+                            <option value="medium" {% if challenge and challenge.difficulty == 'medium' %}selected{% endif %}>Medium</option>
+                            <option value="hard" {% if challenge and challenge.difficulty == 'hard' %}selected{% endif %}>Hard</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="description" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Description <span class="text-red-500">*</span>
+                    </label>
+                    <textarea id="description" name="description" rows="5" required
+                              class="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">{{ challenge.description if challenge else '' }}</textarea>
+                </div>
+                
+                <div>
+                    <label for="starter_code" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Starter Code (Python)
+                    </label>
+                    <textarea id="starter_code" name="starter_code" rows="10"
+                              class="w-full px-4 py-3 font-mono text-sm border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">{{ challenge.starter_code if challenge else '' }}</textarea>
+                </div>
+                
+                <div>
+                    <label for="test_cases_json" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Test Cases (JSON) <span class="text-red-500">*</span>
+                    </label>
+                    <textarea id="test_cases_json" name="test_cases_json" rows="8" required
+                              class="w-full px-4 py-3 font-mono text-sm border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">{{ challenge.test_cases_json if challenge else '[]' }}</textarea>
+                    <p class="text-sm text-gray-500 mt-1">
+                        Format: [{"input": "...", "expected_output": "..."}, ...]
+                    </p>
+                </div>
+                
+                <div>
+                    <label for="points" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Points
+                    </label>
+                    <input type="number" id="points" name="points" min="0"
+                           value="{{ challenge.points if challenge else 20 }}"
+                           class="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                
+                <div class="flex space-x-4">
+                    <button type="submit" 
+                            class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-xl hover:shadow-lg transition font-semibold">
+                        <i class="fas fa-save mr-2"></i> Save
+                    </button>
+                    <a href="{{ url_for('admin.learn_dashboard') }}" 
+                       class="bg-gray-200 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-300 transition font-semibold">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

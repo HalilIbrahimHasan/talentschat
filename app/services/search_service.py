@@ -12,3 +12,4 @@ def search_messages(query, channel_id=None, limit=50):
         q = q.filter_by(channel_id=channel_id)
     return q.order_by(Message.created_at.desc()).limit(limit).all()
 
+

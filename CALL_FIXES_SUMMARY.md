@@ -63,3 +63,4 @@ After these fixes:
 - ✅ Users are automatically logged in after registration
 - ✅ SocketIO errors are harmless and can be ignored
 
+

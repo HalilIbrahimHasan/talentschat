@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Learning Content{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-4xl font-bold text-gray-900 mb-2 flex items-center">
+                <i class="fas fa-cog mr-4 text-indigo-600"></i>
+                Learning Content Management
+            </h1>
+            <p class="text-gray-600">Manage portals, lessons, quizzes, tasks, and coding challenges</p>
+        </div>
+        
+        <!-- Portals Section -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-900">
+                    <i class="fas fa-folder-open mr-2 text-indigo-600"></i> Portals
+                </h2>
+                <a href="{{ url_for('admin.create_portal') }}" 
+                   class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-xl hover:shadow-lg transition">
+                    <i class="fas fa-plus mr-2"></i> Create Portal
+                </a>
+            </div>
+            
+            {% if portals %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for portal in portals %}
+                <div class="border-2 border-indigo-200 rounded-xl p-4 hover:shadow-lg transition">
+                    <h3 class="text-lg font-bold text-gray-900 mb-2">{{ portal.name }}</h3>
+                    {% if portal.description %}
+                    <p class="text-gray-600 text-sm mb-3">{{ portal.description[:100] }}{% if portal.description|length > 100 %}...{% endif %}</p>
+                    {% endif %}
+                    <div class="flex space-x-2">
+                        <a href="{{ url_for('admin.portal_lessons', portal_id=portal.id) }}" 
+                           class="flex-1 bg-indigo-600 text-white px-3 py-2 rounded-lg text-center text-sm hover:bg-indigo-700 transition">
+                            <i class="fas fa-list mr-1"></i> Lessons ({{ portal.lessons.count() }})
+                        </a>
+                        <a href="{{ url_for('admin.edit_portal', portal_id=portal.id) }}" 
+                           class="bg-gray-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-gray-700 transition">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <form method="POST" action="{{ url_for('admin.delete_portal', portal_id=portal.id) }}" 
+                              class="inline" onsubmit="return confirm('Delete this portal and all its lessons?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="bg-red-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-red-700 transition">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-center py-8">No portals yet. Create one to get started!</p>
+            {% endif %}
+        </div>
+        
+        <!-- Coding Challenges Section -->
+        <div class="bg-white rounded-2xl shadow-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-900">
+                    <i class="fas fa-code mr-2 text-purple-600"></i> Coding Challenges
+                </h2>
+                <a href="{{ url_for('admin.create_coding_challenge') }}" 
+                   class="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-xl hover:shadow-lg transition">
+                    <i class="fas fa-plus mr-2"></i> Create Challenge
+                </a>
+            </div>
+            
+            {% if challenges %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% for challenge in challenges %}
+                <div class="border-2 border-purple-200 rounded-xl p-4 hover:shadow-lg transition">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-lg font-bold text-gray-900">{{ challenge.title }}</h3>
+                        <span class="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-semibold">
+                            {{ challenge.difficulty }}
+                        </span>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-3">{{ challenge.description[:150] }}{% if challenge.description|length > 150 %}...{% endif %}</p>
+                    <div class="flex items-center justify-between text-sm mb-3">
+                        <span class="text-purple-600 font-semibold">
+                            <i class="fas fa-star mr-1"></i>{{ challenge.points }} points
+                        </span>
+                    </div>
+                    <div class="flex space-x-2">
+                        <a href="{{ url_for('learn.coding_challenge', challenge_id=challenge.id) }}" 
+                           class="flex-1 bg-purple-600 text-white px-3 py-2 rounded-lg text-center text-sm hover:bg-purple-700 transition">
+                            <i class="fas fa-eye mr-1"></i> View
+                        </a>
+                        <a href="{{ url_for('admin.edit_coding_challenge', challenge_id=challenge.id) }}" 
+                           class="bg-gray-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-gray-700 transition">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <form method="POST" action="{{ url_for('admin.delete_coding_challenge', challenge_id=challenge.id) }}" 
+                              class="inline" onsubmit="return confirm('Delete this coding challenge?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="bg-red-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-red-700 transition">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-500 text-center py-8">No coding challenges yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

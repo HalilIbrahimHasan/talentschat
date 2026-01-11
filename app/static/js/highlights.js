@@ -12,3 +12,4 @@ function updateHighlightUI(messageId, action) {
     }
 }
 
+

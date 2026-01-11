@@ -311,22 +311,21 @@
 <script src="{{ url_for('static', filename='js/reactions.js') }}"></script>
 <script src="{{ url_for('static', filename='js/highlights.js') }}"></script>
 <script src="{{ url_for('static', filename='js/recording.js') }}"></script>
+<!-- recording.js should automatically initialize via initRecording() at the end of the file -->
 <script>
-    // Ensure recording buttons are initialized
+    // Initialize calls after socket is connected
     document.addEventListener('DOMContentLoaded', function() {
-        // Re-initialize recording buttons to ensure they work
-        if (typeof initRecording === 'function') {
-            initRecording();
-        }
-        
-        // Initialize calls after socket is connected
         if (typeof socket !== 'undefined' && socket && socket.connected) {
-            initCalls();
+            if (typeof initCalls === 'function') {
+                initCalls();
+            }
         } else {
             // Wait for socket to connect
             const checkSocket = setInterval(() => {
                 if (typeof socket !== 'undefined' && socket && socket.connected) {
-                    initCalls();
+                    if (typeof initCalls === 'function') {
+                        initCalls();
+                    }
                     clearInterval(checkSocket);
                 }
             }, 100);

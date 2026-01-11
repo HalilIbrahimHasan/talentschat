@@ -28,10 +28,17 @@ def create_app(config_class=Config):
     db.init_app(app)
     login_manager.init_app(app)
     # Configure SocketIO with better error handling for production
+    # Try eventlet first, fallback to threading for local dev
+    try:
+        import eventlet
+        async_mode = 'eventlet'
+    except ImportError:
+        async_mode = 'threading'
+    
     socketio.init_app(
         app, 
         cors_allowed_origins="*",
-        async_mode='eventlet',
+        async_mode=async_mode,
         ping_timeout=60,
         ping_interval=25
     )
@@ -61,6 +68,12 @@ def create_app(config_class=Config):
     
     from app.blueprints.profile import bp as profile_bp
     app.register_blueprint(profile_bp, url_prefix='/profile')
+    
+    from app.blueprints.learn import bp as learn_bp
+    app.register_blueprint(learn_bp)
+    
+    from app.blueprints.admin import bp as admin_bp
+    app.register_blueprint(admin_bp)
     
     from app.blueprints.api import bp as api_bp
     # Exempt API routes from CSRF (they use JSON)
@@ -163,6 +176,11 @@ def create_app(config_class=Config):
                         conn.execute(text("ALTER TABLE users ADD COLUMN bio TEXT"))
                         conn.commit()
                         print("Added bio column to users")
+                    
+                    if 'is_admin' not in user_columns:
+                        conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
+                        conn.commit()
+                        print("Added is_admin column to users")
                 except Exception as ue:
                     print(f"User migration note: {ue}")
                 

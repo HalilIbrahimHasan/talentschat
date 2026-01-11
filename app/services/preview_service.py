@@ -24,3 +24,4 @@ def get_link_preview(url):
     except:
         return None
 
+

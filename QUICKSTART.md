@@ -65,3 +65,4 @@ Make sure the `uploads/` directory exists and is writable. It should be created 
 
 Enjoy using TalentsChat! 🚀
 
+

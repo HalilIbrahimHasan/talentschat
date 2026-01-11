@@ -55,3 +55,4 @@ def can_manage_channel(user, channel):
     # Channel creator can manage
     return channel.created_by == user.id
 
+

@@ -10,3 +10,4 @@ class ArticleForm(FlaskForm):
     is_published = BooleanField('Publish immediately')
     submit = SubmitField('Save Article')
 
+

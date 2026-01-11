@@ -53,3 +53,4 @@ The uploads directory needs to be writable. Check logs for permission errors.
 3. **Check Database** - Tables should auto-create on first request
 4. **Review Error Message** - Copy the full error from logs
 
+

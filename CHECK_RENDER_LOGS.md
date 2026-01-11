@@ -78,3 +78,4 @@ Copy the FULL error traceback from the logs. It will show:
    - Make sure migrations only run for SQLite (fixed in latest code)
    - Verify all imports work
 
+

@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block title %}{{ challenge.title }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+<style>
+.CodeMirror {
+    border: 2px solid #e5e7eb;
+    border-radius: 0.75rem;
+    height: 400px;
+    font-size: 14px;
+}
+.CodeMirror:focus-within {
+    border-color: #6366f1;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Back Link -->
+        <a href="{{ url_for('learn.coding_challenges') }}" class="text-indigo-600 hover:text-indigo-800 mb-4 inline-block">
+            <i class="fas fa-arrow-left mr-2"></i> Back to Coding Challenges
+        </a>
+        
+        <!-- Challenge Header -->
+        <div class="{% if is_completed %}bg-gradient-to-br from-green-50 to-emerald-50 border-4 border-green-400{% else %}bg-white{% endif %} rounded-2xl shadow-lg p-6 mb-6">
+            {% if is_completed %}
+            <div class="mb-4 flex items-center justify-center">
+                <span class="bg-green-500 text-white px-6 py-2 rounded-full text-lg font-bold flex items-center">
+                    <i class="fas fa-check-circle mr-2 text-xl"></i>Challenge Completed!
+                </span>
+            </div>
+            {% endif %}
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-4">
+                    <span class="px-3 py-1 rounded-full text-sm font-semibold
+                        {% if challenge.difficulty == 'easy' %}bg-green-100 text-green-800
+                        {% elif challenge.difficulty == 'medium' %}bg-yellow-100 text-yellow-800
+                        {% else %}bg-red-100 text-red-800{% endif %}">
+                        {{ challenge.difficulty|title }}
+                    </span>
+                    <span class="{% if is_completed %}text-green-600{% else %}text-indigo-600{% endif %} font-bold">
+                        <i class="fas fa-star mr-1"></i>{{ challenge.points }} points
+                    </span>
+                </div>
+            </div>
+            <h1 class="text-4xl font-bold {% if is_completed %}text-green-900{% else %}text-gray-900{% endif %} mb-4">
+                {{ challenge.title }}
+                {% if is_completed %}
+                <i class="fas fa-check-circle text-green-600 ml-3"></i>
+                {% endif %}
+            </h1>
+            {% if challenge.description %}
+            <div class="prose max-w-none mb-4">
+                <p class="text-gray-700 text-lg whitespace-pre-wrap">{{ challenge.description }}</p>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Code Editor Section -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Code Editor -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">
+                        <i class="fas fa-code text-indigo-600 mr-2"></i> Your Solution
+                    </h2>
+                    <textarea id="code-editor">{{ starter_code }}</textarea>
+                    
+                    <div class="mt-4 flex space-x-4">
+                        <button id="run-btn" 
+                                class="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-xl hover:shadow-lg transition font-semibold">
+                            <i class="fas fa-play mr-2"></i> Run Tests
+                        </button>
+                        <button id="submit-btn" 
+                                class="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl hover:shadow-lg transition font-semibold">
+                            <i class="fas fa-paper-plane mr-2"></i> Submit Solution
+                        </button>
+                        <button id="reset-btn" 
+                                class="bg-gray-200 text-gray-700 px-4 py-3 rounded-xl hover:bg-gray-300 transition font-semibold">
+                            <i class="fas fa-redo mr-2"></i> Reset
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Test Results -->
+                <div id="test-results" class="bg-white rounded-2xl shadow-lg p-6 hidden">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">
+                        <i class="fas fa-vial text-indigo-600 mr-2"></i> Test Results
+                    </div>
+                    <div id="test-results-content"></div>
+                </div>
+            </div>
+            
+            <!-- Sidebar: Test Cases & Comments -->
+            <div class="space-y-6">
+                <!-- Test Cases -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">
+                        <i class="fas fa-list-check text-indigo-600 mr-2"></i> Test Cases
+                    </h2>
+                    {% if test_cases %}
+                    <div class="space-y-3">
+                        {% for test_case in test_cases %}
+                        <div class="border-2 border-indigo-100 rounded-lg p-3">
+                            <div class="text-sm font-semibold text-gray-700 mb-1">Test {{ loop.index }}</div>
+                            <div class="text-xs text-gray-600">
+                                <div><strong>Input:</strong> <code class="bg-gray-100 px-2 py-1 rounded">{{ test_case.input }}</code></div>
+                                <div class="mt-1"><strong>Expected:</strong> <code class="bg-gray-100 px-2 py-1 rounded">{{ test_case.expected_output }}</code></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-gray-500 text-sm">No test cases available.</p>
+                    {% endif %}
+                </div>
+                
+                <!-- Comments Section -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">
+                        <i class="fas fa-comments text-indigo-600 mr-2"></i> Comments
+                    </h2>
+                    
+                    <!-- Add Comment Form -->
+                    <form id="comment-form" class="mb-4">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <textarea name="text" rows="3" required
+                                  placeholder="Add a comment..."
+                                  class="w-full px-4 py-3 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 mb-3 text-sm"></textarea>
+                        <button type="submit" 
+                                class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-xl hover:shadow-lg transition font-semibold text-sm">
+                            <i class="fas fa-paper-plane mr-2"></i> Post Comment
+                        </button>
+                    </form>
+                    
+                    <!-- Comments List -->
+                    <div id="comments-list" class="space-y-3 max-h-96 overflow-y-auto">
+                        {% for comment in comments %}
+                        <div class="border-2 border-gray-100 rounded-xl p-3">
+                            <div class="flex items-start mb-2">
+                                {% if comment.user.profile_image %}
+                                <img src="{{ url_for('profile.serve_image', filename=comment.user.profile_image) }}" 
+                                     alt="{{ comment.user.name }}" 
+                                     class="w-8 h-8 rounded-full object-cover border-2 border-indigo-300 mr-2">
+                                {% else %}
+                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs mr-2">
+                                    {{ comment.user.name[0].upper() }}
+                                </div>
+                                {% endif %}
+                                <div class="flex-1">
+                                    <div class="font-semibold text-gray-900 text-sm">{{ comment.user.name }}</div>
+                                    <div class="text-xs text-gray-500">{{ comment.created_at.strftime('%b %d, %Y') }}</div>
+                                </div>
+                            </div>
+                            <p class="text-gray-700 text-sm">{{ comment.text }}</p>
+                        </div>
+                        {% endfor %}
+                        
+                        {% if not comments %}
+                        <div class="text-center py-8 text-gray-400 text-sm">
+                            <i class="fas fa-comments text-3xl mb-2"></i>
+                            <p>No comments yet. Be the first to comment!</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Initialize CodeMirror
+const editor = CodeMirror.fromTextArea(document.getElementById('code-editor'), {
+    mode: 'python',
+    theme: 'monokai',
+    lineNumbers: true,
+    indentUnit: 4,
+    indentWithTabs: false,
+    lineWrapping: true,
+    autofocus: true
+});
+
+const starterCode = `{{ starter_code|e }}`;
+{% if user_submission and user_submission.code %}
+const previousCode = `{{ user_submission.code|e }}`;
+{% endif %}
+
+// Load previous submission if exists, otherwise use starter code
+{% if user_submission and user_submission.code %}
+editor.setValue(previousCode);
+{% else %}
+editor.setValue(starterCode);
+{% endif %}
+
+// Reset button
+document.getElementById('reset-btn').addEventListener('click', () => {
+    if (confirm('Reset code to starter template?')) {
+        editor.setValue(starterCode);
+    }
+});
+
+// Run tests
+document.getElementById('run-btn').addEventListener('click', async () => {
+    const code = editor.getValue();
+    if (!code.trim()) {
+        alert('Please write some code first!');
+        return;
+    }
+    
+    const btn = document.getElementById('run-btn');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Running...';
+    
+    try {
+        // For now, just validate syntax client-side
+        // In production, you'd send to a server-side code execution service
+        const resultsDiv = document.getElementById('test-results');
+        const contentDiv = document.getElementById('test-results-content');
+        
+        // Simulate test results (replace with actual API call)
+        contentDiv.innerHTML = `
+            <div class="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4">
+                <div class="flex items-center mb-2">
+                    <i class="fas fa-info-circle text-yellow-600 mr-2"></i>
+                    <span class="font-semibold text-yellow-800">Test Execution</span>
+                </div>
+                <p class="text-yellow-700 text-sm">
+                    Code execution requires server-side support. Click "Submit Solution" to test your code against all test cases.
+                </p>
+            </div>
+        `;
+        resultsDiv.classList.remove('hidden');
+    } catch (error) {
+        alert('Error running tests: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+});
+
+// Submit solution
+document.getElementById('submit-btn').addEventListener('click', async () => {
+    const code = editor.getValue();
+    if (!code.trim()) {
+        alert('Please write some code first!');
+        return;
+    }
+    
+    if (!confirm('Submit your solution? This will test your code against all test cases.')) {
+        return;
+    }
+    
+    const btn = document.getElementById('submit-btn');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Submitting...';
+    
+    try {
+        const response = await fetch('/api/coding/submit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({
+                challenge_id: {{ challenge.id }},
+                code: code
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            const resultsDiv = document.getElementById('test-results');
+            const contentDiv = document.getElementById('test-results-content');
+            
+            if (data.status === 'passed') {
+                contentDiv.innerHTML = `
+                    <div class="bg-green-50 border-2 border-green-200 rounded-xl p-4">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-check-circle text-green-600 text-2xl mr-2"></i>
+                            <span class="font-bold text-green-800 text-lg">All Tests Passed! 🎉</span>
+                        </div>
+                        <p class="text-green-700 mb-2">
+                            Score: ${data.score} / ${data.total_points} points
+                        </p>
+                        <p class="text-green-600 text-sm">
+                            Congratulations! Your solution is correct. You earned ${data.points_earned || data.score} points!
+                        </p>
+                    </div>
+                `;
+                alert(`Success! You earned ${data.points_earned || data.score} points!`);
+            } else {
+                contentDiv.innerHTML = `
+                    <div class="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-times-circle text-red-600 text-2xl mr-2"></i>
+                            <span class="font-bold text-red-800 text-lg">Tests Failed</span>
+                        </div>
+                        <p class="text-red-700 mb-2">
+                            Score: ${data.score || 0} / ${data.total_points || 0} points
+                        </p>
+                        ${data.error ? `<p class="text-red-600 text-sm mb-2"><strong>Error:</strong> ${data.error}</p>` : ''}
+                        ${data.failed_tests ? `<p class="text-red-600 text-sm">Some test cases did not pass. Please review your solution.</p>` : ''}
+                    </div>
+                `;
+            }
+            resultsDiv.classList.remove('hidden');
+        } else {
+            alert('Error: ' + (data.error || 'Failed to submit solution'));
+        }
+    } catch (error) {
+        alert('Error submitting solution: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+});
+
+// Comment submission
+document.getElementById('comment-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const text = formData.get('text');
+    
+    try {
+        const response = await fetch('/api/comments', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': formData.get('csrf_token')
+            },
+            body: JSON.stringify({ challenge_id: {{ challenge.id }}, text })
+        });
+        
+        if (response.ok) {
+            location.reload();
+        } else {
+            const data = await response.json();
+            alert('Error: ' + (data.error || 'Failed to post comment'));
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+});
+</script>
+{% endblock %}
+
