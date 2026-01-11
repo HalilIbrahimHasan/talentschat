@@ -49,7 +49,7 @@
         
         <!-- Leaderboard Table -->
         <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
-            {% if scores %}
+            {% if user_scores %}
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
@@ -61,42 +61,60 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
-                        {% for score in scores %}
-                        <tr class="hover:bg-indigo-50 transition {% if loop.index <= 3 %}bg-gradient-to-r {% if loop.index == 1 %}from-yellow-50 to-yellow-100{% elif loop.index == 2 %}from-gray-50 to-gray-100{% elif loop.index == 3 %}from-orange-50 to-orange-100{% endif %}{% endif %}">
+                        {% for item in user_scores %}
+                        {% set rank = loop.index %}
+                        <tr class="hover:bg-indigo-50 transition 
+                            {% if rank == 1 %}bg-gradient-to-r from-yellow-50 to-yellow-100 border-l-4 border-yellow-500{% endif %}
+                            {% if rank == 2 %}bg-gradient-to-r from-gray-50 to-gray-100 border-l-4 border-gray-400{% endif %}
+                            {% if rank == 3 %}bg-gradient-to-r from-orange-50 to-orange-100 border-l-4 border-orange-500{% endif %}">
                             <td class="px-6 py-4">
                                 <div class="flex items-center">
-                                    {% if loop.index == 1 %}
-                                    <span class="text-2xl mr-3">🥇</span>
-                                    {% elif loop.index == 2 %}
-                                    <span class="text-2xl mr-3">🥈</span>
-                                    {% elif loop.index == 3 %}
-                                    <span class="text-2xl mr-3">🥉</span>
+                                    {% if rank == 1 %}
+                                    <div class="flex items-center">
+                                        <span class="text-3xl mr-3">💎</span>
+                                        <span class="text-xl font-bold text-yellow-600">1st</span>
+                                    </div>
+                                    {% elif rank == 2 %}
+                                    <div class="flex items-center">
+                                        <span class="text-3xl mr-3">🥇</span>
+                                        <span class="text-xl font-bold text-gray-600">2nd</span>
+                                    </div>
+                                    {% elif rank == 3 %}
+                                    <div class="flex items-center">
+                                        <span class="text-3xl mr-3">🥈</span>
+                                        <span class="text-xl font-bold text-orange-600">3rd</span>
+                                    </div>
                                     {% else %}
-                                    <span class="text-lg font-bold text-gray-500 mr-3">#{{ loop.index }}</span>
+                                    <span class="text-lg font-bold text-gray-500 mr-3">#{{ rank }}</span>
                                     {% endif %}
                                 </div>
                             </td>
                             <td class="px-6 py-4">
                                 <div class="flex items-center">
-                                    {% if score.user.profile_image %}
-                                    <img src="{{ url_for('profile.serve_image', filename=score.user.profile_image) }}" 
-                                         alt="{{ score.user.name }}" 
-                                         class="w-10 h-10 rounded-full object-cover border-2 border-indigo-300 mr-3">
+                                    {% if item.user.profile_image %}
+                                    <img src="{{ url_for('profile.serve_image', filename=item.user.profile_image) }}" 
+                                         alt="{{ item.user.name }}" 
+                                         class="w-10 h-10 rounded-full object-cover border-2 {% if rank <= 3 %}border-yellow-400{% else %}border-indigo-300{% endif %} mr-3">
                                     {% else %}
-                                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold mr-3">
-                                        {{ score.user.name[0].upper() }}
+                                    <div class="w-10 h-10 rounded-full {% if rank == 1 %}bg-gradient-to-br from-yellow-400 to-yellow-600{% elif rank == 2 %}bg-gradient-to-br from-gray-400 to-gray-600{% elif rank == 3 %}bg-gradient-to-br from-orange-400 to-orange-600{% else %}bg-gradient-to-br from-indigo-500 to-purple-600{% endif %} flex items-center justify-center text-white font-bold mr-3">
+                                        {{ item.user.name[0].upper() }}
                                     </div>
                                     {% endif %}
                                     <div>
-                                        <div class="font-semibold text-gray-900">{{ score.user.name }}</div>
-                                        <div class="text-sm text-gray-500">{{ score.user.email }}</div>
+                                        <div class="font-semibold {% if rank <= 3 %}text-lg{% else %}text-gray-900{% endif %}">
+                                            {{ item.user.name }}
+                                            {% if item.user.id == current_user.id %}
+                                            <span class="text-sm text-indigo-600 ml-2">(You)</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="text-sm text-gray-500">{{ item.user.email }}</div>
                                     </div>
                                 </div>
                             </td>
                             <td class="px-6 py-4">
-                                {% if score.portal %}
+                                {% if portal %}
                                 <span class="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-semibold">
-                                    {{ score.portal.name }}
+                                    {{ portal.name }}
                                 </span>
                                 {% else %}
                                 <span class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-semibold">
@@ -106,7 +124,9 @@
                             </td>
                             <td class="px-6 py-4 text-right">
                                 <div class="flex items-center justify-end">
-                                    <span class="text-2xl font-bold text-indigo-600">{{ score.total_points }}</span>
+                                    <span class="text-2xl font-bold {% if rank == 1 %}text-yellow-600{% elif rank == 2 %}text-gray-600{% elif rank == 3 %}text-orange-600{% else %}text-indigo-600{% endif %}">
+                                        {{ item.total_points }}
+                                    </span>
                                     <span class="text-gray-500 ml-2">pts</span>
                                 </div>
                             </td>
@@ -129,7 +149,7 @@
         </div>
         
         <!-- Info Box -->
-        {% if scores %}
+        {% if user_scores %}
         <div class="mt-6 bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
             <div class="flex items-start">
                 <i class="fas fa-info-circle text-blue-600 mt-1 mr-3"></i>

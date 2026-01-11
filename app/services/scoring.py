@@ -3,7 +3,7 @@ from datetime import datetime
 from app.extensions import db
 from app.models.learning import (
     LeaderboardScore, StudentProgress, QuizSubmission, 
-    TaskSubmission, CodingSubmission, Lesson, Quiz
+    TaskSubmission, CodingSubmission, Lesson, Quiz, Task
 )
 
 

@@ -116,6 +116,8 @@ def coding_challenge(challenge_id):
 @login_required
 def leaderboard():
     """Leaderboard page"""
+    from app.models.user import User
+    
     portal_id = request.args.get('portal_id', type=int)
     range_filter = request.args.get('range', 'all')  # 'week', 'all'
     
@@ -124,25 +126,38 @@ def leaderboard():
     if portal_id:
         portal = Portal.query.get(portal_id)
     
-    # Query leaderboard scores
-    query = LeaderboardScore.query
+    # Get all users and their scores
+    all_users = User.query.all()
+    user_scores = []
     
-    if portal_id:
-        query = query.filter_by(portal_id=portal_id)
-    else:
-        query = query.filter_by(portal_id=None)  # All portals combined
+    for user in all_users:
+        # Get score for this portal or all portals
+        score_record = LeaderboardScore.query.filter_by(
+            user_id=user.id,
+            portal_id=portal_id if portal_id else None
+        ).first()
+        
+        total_points = score_record.total_points if score_record else 0
+        
+        user_scores.append({
+            'user': user,
+            'portal': portal,
+            'total_points': total_points,
+            'score_record': score_record
+        })
     
-    # Time range filter (for future: week filter)
-    # For now, just show all-time
+    # Sort by points descending
+    user_scores.sort(key=lambda x: x['total_points'], reverse=True)
     
-    scores = query.order_by(LeaderboardScore.total_points.desc()).limit(100).all()
+    # Limit to top 100
+    user_scores = user_scores[:100]
     
     # Get all portals for filter dropdown
     portals = Portal.query.order_by(Portal.id).all()
     
     return render_template(
         'learn/leaderboard.html',
-        scores=scores,
+        user_scores=user_scores,
         portal=portal,
         portals=portals,
         current_portal_id=portal_id,
