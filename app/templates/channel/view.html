@@ -312,9 +312,14 @@
 <script src="{{ url_for('static', filename='js/highlights.js') }}"></script>
 <script src="{{ url_for('static', filename='js/recording.js') }}"></script>
 <script>
-    // Initialize calls after socket is connected
+    // Ensure recording buttons are initialized
     document.addEventListener('DOMContentLoaded', function() {
-        // Initialize calls after socket is initialized (called from chat.js)
+        // Re-initialize recording buttons to ensure they work
+        if (typeof initRecording === 'function') {
+            initRecording();
+        }
+        
+        // Initialize calls after socket is connected
         if (typeof socket !== 'undefined' && socket && socket.connected) {
             initCalls();
         } else {

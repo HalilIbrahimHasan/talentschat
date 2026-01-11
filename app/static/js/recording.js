@@ -258,8 +258,8 @@ async function handleRecordingComplete() {
     await uploadRecording(file, isScreenShare ? 'screen_share' : 'recording');
     
     // Reset
-    recordedChunks = [];
-    isRecording = false;
+    recordingRecordedChunks = [];
+    isSelfRecording = false;
     
     const recordingModal = document.getElementById('recordingModal');
     if (recordingModal) {

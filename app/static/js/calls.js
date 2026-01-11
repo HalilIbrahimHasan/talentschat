@@ -231,7 +231,7 @@ function endCall() {
         });
     }
     
-    // CRITICAL: Stop ALL video tracks FIRST from localStream (this turns off the camera light)
+    // CRITICAL: Stop ALL video tracks FIRST from ALL streams (this turns off the camera light)
     // Do this BEFORE clearing references
     if (localStream) {
         localStream.getVideoTracks().forEach(track => {
@@ -248,6 +248,25 @@ function endCall() {
                 console.log('✅ Stopped localStream audio track:', track.id);
             } catch (e) {
                 console.warn('Error stopping localStream audio track:', e);
+            }
+        });
+    }
+    
+    if (screenShareStream) {
+        screenShareStream.getVideoTracks().forEach(track => {
+            try {
+                track.stop();
+                console.log('✅ Stopped screenShareStream video track:', track.id);
+            } catch (e) {
+                console.warn('Error stopping screenShareStream video track:', e);
+            }
+        });
+        screenShareStream.getAudioTracks().forEach(track => {
+            try {
+                track.stop();
+                console.log('✅ Stopped screenShareStream audio track:', track.id);
+            } catch (e) {
+                console.warn('Error stopping screenShareStream audio track:', e);
             }
         });
     }
