@@ -69,8 +69,22 @@ class Article(db.Model):
             
         html = self.content
         
-        # Convert headers first (before other processing)
+        # Convert code blocks first (before other processing)
         import re
+        
+        # Convert code blocks (```language ... ```) to <pre><code>
+        def code_block_replacer(match):
+            language = match.group(1) or ''
+            code = match.group(2)
+            lang_class = f' class="language-{language}"' if language else ''
+            return f'<pre><code{lang_class}>{code}</code></pre>'
+        
+        html = re.sub(r'```(\w+)?\n(.*?)```', code_block_replacer, html, flags=re.DOTALL)
+        
+        # Convert inline code (`code`) to <code>
+        html = re.sub(r'`([^`]+)`', r'<code>\1</code>', html)
+        
+        # Convert headers (after code blocks)
         html = re.sub(r'^### (.+)$', r'<h3>\1</h3>', html, flags=re.MULTILINE)
         html = re.sub(r'^## (.+)$', r'<h2>\1</h2>', html, flags=re.MULTILINE)
         html = re.sub(r'^# (.+)$', r'<h1>\1</h1>', html, flags=re.MULTILINE)
