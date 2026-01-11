@@ -49,8 +49,19 @@
         {% if challenges %}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {% for challenge in challenges %}
-            <div class="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition transform hover:-translate-y-1">
+            {% set is_completed = challenge.id in completed_challenge_ids %}
+            <div class="rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition transform hover:-translate-y-1
+                {% if is_completed %}bg-gradient-to-br from-green-50 to-emerald-50 border-4 border-green-400{% else %}bg-white{% endif %}">
                 <div class="p-6">
+                    <!-- Completion Badge -->
+                    {% if is_completed %}
+                    <div class="mb-3 flex items-center justify-center">
+                        <span class="bg-green-500 text-white px-4 py-1 rounded-full text-sm font-bold flex items-center">
+                            <i class="fas fa-check-circle mr-2"></i>Completed
+                        </span>
+                    </div>
+                    {% endif %}
+                    
                     <!-- Difficulty Badge -->
                     <div class="flex items-center justify-between mb-4">
                         <span class="px-3 py-1 rounded-full text-sm font-semibold
@@ -59,21 +70,27 @@
                             {% else %}bg-red-100 text-red-800{% endif %}">
                             {{ challenge.difficulty|title }}
                         </span>
-                        <span class="text-indigo-600 font-bold">
+                        <span class="{% if is_completed %}text-green-600{% else %}text-indigo-600{% endif %} font-bold">
                             <i class="fas fa-star mr-1"></i>{{ challenge.points }} pts
                         </span>
                     </div>
 
                     <!-- Title -->
-                    <h3 class="text-xl font-bold text-gray-900 mb-3">{{ challenge.title }}</h3>
+                    <h3 class="text-xl font-bold {% if is_completed %}text-green-900{% else %}text-gray-900{% endif %} mb-3">
+                        {{ challenge.title }}
+                        {% if is_completed %}
+                        <i class="fas fa-check-circle text-green-600 ml-2"></i>
+                        {% endif %}
+                    </h3>
                     
                     <!-- Description -->
-                    <p class="text-gray-600 text-sm mb-4 line-clamp-3">{{ challenge.description }}</p>
+                    <p class="{% if is_completed %}text-green-800{% else %}text-gray-600{% endif %} text-sm mb-4 line-clamp-3">{{ challenge.description }}</p>
 
                     <!-- View Challenge Button -->
                     <a href="{{ url_for('learn.coding_challenge', challenge_id=challenge.id) }}" 
-                       class="block w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-center px-4 py-3 rounded-xl hover:shadow-lg transition font-semibold">
-                        <i class="fas fa-code mr-2"></i> Start Challenge
+                       class="block w-full {% if is_completed %}bg-gradient-to-r from-green-500 to-emerald-600{% else %}bg-gradient-to-r from-indigo-600 to-purple-600{% endif %} text-white text-center px-4 py-3 rounded-xl hover:shadow-lg transition font-semibold">
+                        <i class="fas {% if is_completed %}fa-redo{% else %}fa-code{% endif %} mr-2"></i> 
+                        {% if is_completed %}Review Solution{% else %}Start Challenge{% endif %}
                     </a>
                 </div>
             </div>

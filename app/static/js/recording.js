@@ -3,7 +3,7 @@
 let recordingMediaRecorder = null;
 let recordingRecordedChunks = [];
 let recordingStream = null;
-let recordingStartTime = null;
+let selfRecordingStartTime = null; // Renamed from recordingStartTime to avoid conflict with calls.js
 let recordingTimer = null;
 let isSelfRecording = false; // Changed from isRecording to avoid conflict with calls.js
 let isScreenShare = false;
@@ -25,11 +25,18 @@ function initRecording() {
     console.log('screenRecordingBtn found:', !!screenRecordingBtn);
     
     if (recordBtn) {
-        recordBtn.addEventListener('click', (e) => {
+        recordBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
             console.log('Record button clicked!');
-            startRecording('camera');
+            console.log('Calling startRecording("camera")...');
+            try {
+                await startRecording('camera');
+                console.log('startRecording completed');
+            } catch (error) {
+                console.error('Error in startRecording:', error);
+                alert('Error starting recording: ' + error.message);
+            }
         });
         console.log('Record button event listener attached');
     } else {
@@ -61,19 +68,23 @@ function initRecording() {
 
 async function startRecording(type) {
     try {
+        console.log('startRecording called with type:', type);
         isScreenShare = (type === 'screen');
         
         // Request media access
+        console.log('Requesting media access...');
         if (type === 'screen') {
             recordingStream = await navigator.mediaDevices.getDisplayMedia({
                 video: { mediaSource: 'screen' },
                 audio: true
             });
         } else {
+            console.log('Calling getUserMedia for camera...');
             recordingStream = await navigator.mediaDevices.getUserMedia({
                 video: true,
                 audio: true
             });
+            console.log('getUserMedia succeeded, stream obtained:', recordingStream);
         }
         
         // Show preview
@@ -126,7 +137,7 @@ async function startRecording(type) {
         // Start recording
         recordingMediaRecorder.start(1000); // Collect data every second
         isSelfRecording = true;
-        recordingStartTime = Date.now();
+        selfRecordingStartTime = Date.now();
         
         // Start timer
         updateRecordingTimer();
@@ -154,9 +165,9 @@ async function startRecording(type) {
 }
 
 function updateRecordingTimer() {
-    if (!isSelfRecording || !recordingStartTime) return;
+    if (!isSelfRecording || !selfRecordingStartTime) return;
     
-    const elapsed = Date.now() - recordingStartTime;
+    const elapsed = Date.now() - selfRecordingStartTime;
     const minutes = Math.floor(elapsed / 60000);
     const seconds = Math.floor((elapsed % 60000) / 1000);
     
@@ -348,6 +359,9 @@ async function uploadRecording(file, videoType) {
         progressDiv.remove();
     }
 }
+
+// Make startRecording globally available
+window.startRecording = startRecording;
 
 // Initialize on page load
 if (document.readyState === 'loading') {

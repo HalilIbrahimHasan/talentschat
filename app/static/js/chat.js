@@ -494,40 +494,44 @@ function loadMessages() {
         .catch(err => console.error('Error loading messages:', err));
 }
 
-// Message form handler
-document.getElementById('messageForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const input = document.getElementById('messageInput');
-    const content = input.value.trim();
-    
-    if (!content) return;
-    
-    if (socket && socket.connected) {
-        socket.emit('send_message', {
-            channel_id: currentChannelId,
-            content: content
-        });
-    } else {
-        // Fallback to HTTP
-        fetch('/api/messages', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                channel_id: currentChannelId,
-                content: content
-            })
-        })
-        .then(res => res.json())
-        .then(data => {
-            addMessageToUI(data);
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+    // Message form handler
+    const messageForm = document.getElementById('messageForm');
+    if (messageForm) {
+        messageForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+            
+            if (!content) return;
+            
+            if (socket && socket.connected) {
+                socket.emit('send_message', {
+                    channel_id: currentChannelId,
+                    content: content
+                });
+            } else {
+                // Fallback to HTTP
+                fetch('/api/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        channel_id: currentChannelId,
+                        content: content
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    addMessageToUI(data);
+                });
+            }
+            
+            input.value = '';
         });
     }
     
-    input.value = '';
-});
-
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
+    // Initialize socket and load messages
     initSocket();
     loadMessages();
 });

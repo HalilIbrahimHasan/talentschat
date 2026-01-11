@@ -2,7 +2,7 @@
 from flask import render_template, redirect, url_for, flash, request, abort, jsonify
 from flask_login import login_required, current_user
 from app.blueprints.learn import bp
-from app.models.learning import Portal, Lesson, Quiz, QuizQuestion, Task, CodingChallenge, StudentProgress, Comment, LeaderboardScore
+from app.models.learning import Portal, Lesson, Quiz, QuizQuestion, Task, CodingChallenge, StudentProgress, Comment, LeaderboardScore, CodingSubmission
 from app.models.user import User
 from app.extensions import db
 from app.utils.youtube import extract_youtube_id, get_youtube_embed_url
@@ -99,10 +99,18 @@ def coding_challenges():
         CodingChallenge.id
     ).all()
     
+    # Get completed challenge IDs for current user
+    completed_submissions = CodingSubmission.query.filter_by(
+        user_id=current_user.id,
+        status='passed'
+    ).all()
+    completed_challenge_ids = {sub.challenge_id for sub in completed_submissions}
+    
     return render_template(
         'learn/coding_challenges.html',
         challenges=challenges,
-        current_difficulty=difficulty
+        current_difficulty=difficulty,
+        completed_challenge_ids=completed_challenge_ids
     )
 
 
