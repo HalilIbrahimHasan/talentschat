@@ -23,6 +23,15 @@
     align-items: center;
     animation: slideInRight 0.3s ease-out;
 }
+.word-highlight {
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+}
+.word-highlight.active {
+    background-color: #FDE047;
+    font-weight: 600;
+}
 @keyframes slideInRight {
     from {
         transform: translateX(100%);
@@ -48,7 +57,20 @@
         <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
             <h1 class="text-4xl font-bold text-gray-900 mb-4">{{ lesson.title }}</h1>
             {% if lesson.description %}
-            <p class="text-gray-600 text-lg mb-4">{{ lesson.description }}</p>
+            <div class="mb-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-xl font-semibold text-gray-800">Lesson Description</h2>
+                    <button id="tts-btn" 
+                            class="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-xl hover:shadow-lg transform hover:scale-105 transition font-semibold flex items-center space-x-2"
+                            title="Listen to the text">
+                        <i class="fas fa-volume-up" id="tts-icon"></i>
+                        <span id="tts-text">Listen</span>
+                    </button>
+                </div>
+                <div id="lesson-description-container" class="text-gray-600 text-lg leading-relaxed">
+                    <p id="lesson-description">{{ lesson.description }}</p>
+                </div>
+            </div>
             {% endif %}
             <div class="flex items-center space-x-4 text-sm text-gray-500">
                 <span><i class="fas fa-star text-yellow-500 mr-1"></i>{{ lesson.points_complete }} points on completion</span>
@@ -237,6 +259,271 @@
 </div>
 
 <script>
+// Text-to-Speech functionality
+        let speechSynthesis = window.speechSynthesis;
+        let currentUtterance = null;
+        let isSpeaking = false;
+        let highlightTimeout = null;
+        let words = [];
+        let wordSpans = [];
+        let originalText = ''; // Store original text for utterance
+        let wordStartIndices = []; // Store character index where each word starts
+
+function wrapWordsInSpans() {
+    const container = document.getElementById('lesson-description-container');
+    const descriptionEl = document.getElementById('lesson-description');
+    if (!container || !descriptionEl) return;
+    
+    // Store original text BEFORE any modifications
+    originalText = descriptionEl.textContent;
+    
+    // Split text into words (keep words with spaces for proper indexing)
+    const textParts = originalText.split(/(\s+)/);
+    words = [];
+    wordStartIndices = [];
+    let charIndex = 0;
+    
+    textParts.forEach(part => {
+        if (part.trim() !== '') {
+            // This is a word
+            wordStartIndices.push(charIndex);
+            words.push(part);
+            charIndex += part.length;
+        } else if (part.length > 0) {
+            // This is whitespace
+            charIndex += part.length;
+        }
+    });
+    
+    // Wrap each word in a span
+    const html = words.map((word, index) => {
+        return `<span class="word-highlight" data-word-index="${index}">${word}</span>`;
+    }).join(' ');
+    
+    descriptionEl.innerHTML = html;
+    
+    // Store references to word spans
+    wordSpans = Array.from(descriptionEl.querySelectorAll('.word-highlight'));
+}
+
+function clearHighlights() {
+    document.querySelectorAll('.word-highlight').forEach(span => {
+        span.classList.remove('active');
+    });
+    if (highlightTimeout) {
+        clearTimeout(highlightTimeout);
+        highlightTimeout = null;
+    }
+}
+
+function highlightWordAtIndex(charIndex) {
+    // Find which word contains this character index
+    let wordIndex = -1;
+    for (let i = 0; i < wordStartIndices.length; i++) {
+        const startIndex = wordStartIndices[i];
+        const wordLength = words[i].length;
+        if (charIndex >= startIndex && charIndex < startIndex + wordLength) {
+            wordIndex = i;
+            break;
+        }
+    }
+    
+    if (wordIndex === -1 || wordIndex >= wordSpans.length) return;
+    
+    // Remove active class from all words
+    wordSpans.forEach(span => span.classList.remove('active'));
+    
+    // Add active class to current word
+    const currentSpan = wordSpans[wordIndex];
+    if (currentSpan) {
+        currentSpan.classList.add('active');
+        // Scroll into view if needed
+        const rect = currentSpan.getBoundingClientRect();
+        const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+        if (!isVisible) {
+            currentSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+}
+
+function startTimingBasedHighlighting(speechRate) {
+    clearHighlights();
+    let currentWordIndex = 0;
+    
+    // Timing calculation based on speech rate
+    // At rate 0.55, speech is very slow
+    // Base timing: ~500ms per word for normal speech at rate 1.0
+    // At rate 0.55: ~900ms per word (500 / 0.55)
+    const baseTimePerWord = 500; // milliseconds at rate 1.0
+    const adjustedTimePerWord = baseTimePerWord / speechRate;
+    
+    function highlightNextWord() {
+        if (currentWordIndex >= words.length || !isSpeaking) {
+            highlightTimeout = null;
+            return;
+        }
+        
+        // Remove active class from all words
+        wordSpans.forEach(span => span.classList.remove('active'));
+        
+        // Add active class to current word
+        if (wordSpans[currentWordIndex]) {
+            wordSpans[currentWordIndex].classList.add('active');
+            const rect = wordSpans[currentWordIndex].getBoundingClientRect();
+            const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+            if (!isVisible) {
+                wordSpans[currentWordIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+        
+        const currentWord = words[currentWordIndex];
+        const wordLength = currentWord.length;
+        const hasPunctuation = /[.,!?;:]$/.test(currentWord);
+        
+        // Calculate delay based on word characteristics
+        let delay = adjustedTimePerWord;
+        delay += Math.max(0, (wordLength - 4) * 30); // +30ms per character over 4
+        delay += hasPunctuation ? 250 : 0; // +250ms for punctuation
+        
+        currentWordIndex++;
+        
+        // Schedule next word
+        if (currentWordIndex < words.length && isSpeaking) {
+            highlightTimeout = setTimeout(highlightNextWord, delay);
+        } else {
+            highlightTimeout = null;
+        }
+    }
+    
+    // Start highlighting
+    highlightNextWord();
+}
+
+document.getElementById('tts-btn')?.addEventListener('click', function() {
+    const descriptionEl = document.getElementById('lesson-description');
+    const container = document.getElementById('lesson-description-container');
+    const btn = document.getElementById('tts-btn');
+    const icon = document.getElementById('tts-icon');
+    const textSpan = document.getElementById('tts-text');
+    
+    if (!descriptionEl || !btn || !icon || !textSpan) return;
+    
+    // Always wrap words in spans to ensure originalText is set
+    if (!descriptionEl.querySelector('.word-highlight')) {
+        wrapWordsInSpans();
+    }
+    
+    // Ensure originalText is set (in case wrapWordsInSpans wasn't called)
+    if (!originalText) {
+        wrapWordsInSpans();
+    }
+    
+    if (!originalText) return;
+    
+    if (isSpeaking) {
+        // Stop speaking
+        speechSynthesis.cancel();
+        clearHighlights();
+        isSpeaking = false;
+        icon.className = 'fas fa-volume-up';
+        textSpan.textContent = 'Listen';
+        btn.classList.remove('bg-gradient-to-r', 'from-red-500', 'to-red-600');
+        btn.classList.add('bg-gradient-to-r', 'from-blue-500', 'to-cyan-600');
+    } else {
+        // Start speaking
+        if (currentUtterance) {
+            speechSynthesis.cancel();
+        }
+        
+        clearHighlights();
+        
+        // Use original text (before HTML wrapping) for the utterance
+        currentUtterance = new SpeechSynthesisUtterance(originalText);
+        
+        // Configure voice settings
+        const speechRate = 0.55; // Slow rate for better comprehension and learning
+        currentUtterance.rate = speechRate;
+        currentUtterance.pitch = 1;
+        currentUtterance.volume = 1;
+        
+        // Try to use a nice English voice
+        const voices = speechSynthesis.getVoices();
+        const englishVoice = voices.find(voice => 
+            voice.lang.startsWith('en') && (voice.name.includes('Samantha') || voice.name.includes('Alex') || voice.name.includes('Karen'))
+        ) || voices.find(voice => voice.lang.startsWith('en'));
+        
+        if (englishVoice) {
+            currentUtterance.voice = englishVoice;
+        }
+        
+        // Update UI on start
+        currentUtterance.onstart = function() {
+            isSpeaking = true;
+            icon.className = 'fas fa-stop';
+            textSpan.textContent = 'Stop';
+            btn.classList.remove('bg-gradient-to-r', 'from-blue-500', 'to-cyan-600');
+            btn.classList.add('bg-gradient-to-r', 'from-red-500', 'to-red-600');
+            
+            clearHighlights();
+        };
+        
+        // Use boundary event to highlight words as they are spoken
+        // Note: Boundary events have limited browser support, so we'll use timing as primary
+        // and boundary events as enhancement if available
+        let useBoundaryEvents = false;
+        currentUtterance.onboundary = function(event) {
+            if (event.name === 'word') {
+                useBoundaryEvents = true;
+                highlightWordAtIndex(event.charIndex);
+            }
+        };
+        
+        // Use timing-based highlighting (more reliable across browsers)
+        // Start after a brief delay to allow boundary events to take over if available
+        setTimeout(function() {
+            if (!useBoundaryEvents && isSpeaking) {
+                startTimingBasedHighlighting(speechRate);
+            }
+        }, 100);
+        
+        // Update UI on end
+        currentUtterance.onend = function() {
+            clearHighlights();
+            isSpeaking = false;
+            icon.className = 'fas fa-volume-up';
+            textSpan.textContent = 'Listen';
+            btn.classList.remove('bg-gradient-to-r', 'from-red-500', 'to-red-600');
+            btn.classList.add('bg-gradient-to-r', 'from-blue-500', 'to-cyan-600');
+        };
+        
+        // Handle errors
+        currentUtterance.onerror = function(event) {
+            console.error('Speech synthesis error:', event);
+            clearHighlights();
+            isSpeaking = false;
+            icon.className = 'fas fa-volume-up';
+            textSpan.textContent = 'Listen';
+            btn.classList.remove('bg-gradient-to-r', 'from-red-500', 'to-red-600');
+            btn.classList.add('bg-gradient-to-r', 'from-blue-500', 'to-cyan-600');
+            alert('Text-to-speech is not available. Please try a different browser.');
+        };
+        
+        speechSynthesis.speak(currentUtterance);
+    }
+});
+
+// Load voices when available (some browsers need this)
+if (speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = function() {
+        // Voices loaded, ready to use
+    };
+}
+
+// Wrap words on page load
+document.addEventListener('DOMContentLoaded', function() {
+    wrapWordsInSpans();
+});
+
 // Initialize YouTube API
 {% if youtube_embed_url %}
 // Load YouTube IFrame API script if not already loaded
