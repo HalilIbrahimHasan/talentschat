@@ -4,7 +4,7 @@ from flask_login import login_required, current_user
 from app.blueprints.api import bp
 from app.models.learning import (
     Quiz, QuizQuestion, QuizSubmission, Task, TaskSubmission,
-    StudentProgress, Lesson, Comment, CodingChallenge
+    StudentProgress, Lesson, Comment, CodingChallenge, CodingSubmission
 )
 from app.extensions import db
 from app.services.scoring import recalculate_user_score
@@ -178,6 +178,70 @@ def update_progress():
         
         db.session.commit()
         return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+
+@bp.route('/coding/submit', methods=['POST'])
+@login_required
+def submit_coding_solution():
+    """Submit coding challenge solution"""
+    try:
+        data = request.get_json()
+        challenge_id = data.get('challenge_id')
+        code = data.get('code', '').strip()
+        
+        if not challenge_id:
+            return jsonify({'error': 'challenge_id required'}), 400
+        
+        if not code:
+            return jsonify({'error': 'Code required'}), 400
+        
+        challenge = CodingChallenge.query.get_or_404(challenge_id)
+        
+        # Parse test cases
+        import json
+        try:
+            test_cases = json.loads(challenge.test_cases_json) if challenge.test_cases_json else []
+        except:
+            test_cases = []
+        
+        # For now, return a placeholder response
+        # In production, you'd execute the code in a sandbox and test against test cases
+        # This is a simplified version that just validates the submission
+        total_points = challenge.points
+        score = 0
+        status = 'failed'
+        
+        # TODO: Implement actual code execution and testing
+        # For now, accept any non-empty code as a "passed" submission (placeholder)
+        if code and len(code) > 10:  # Simple validation
+            score = total_points
+            status = 'passed'
+        
+        # Save submission
+        submission = CodingSubmission(
+            user_id=current_user.id,
+            challenge_id=challenge_id,
+            code=code,
+            status=status,
+            score=score
+        )
+        db.session.add(submission)
+        db.session.commit()
+        
+        # Recalculate user score if passed
+        if status == 'passed':
+            recalculate_user_score(current_user.id, None)
+        
+        return jsonify({
+            'success': True,
+            'status': status,
+            'score': score,
+            'total_points': total_points,
+            'points_earned': score if status == 'passed' else 0
+        })
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 400

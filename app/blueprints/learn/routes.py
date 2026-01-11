@@ -84,6 +84,28 @@ def lesson_detail(lesson_id):
     )
 
 
+@bp.route('/code')
+@login_required
+def coding_challenges():
+    """List all coding challenges"""
+    difficulty = request.args.get('difficulty', '')
+    
+    query = CodingChallenge.query.filter_by(is_active=True)
+    if difficulty:
+        query = query.filter_by(difficulty=difficulty)
+    
+    challenges = query.order_by(
+        CodingChallenge.difficulty,
+        CodingChallenge.id
+    ).all()
+    
+    return render_template(
+        'learn/coding_challenges.html',
+        challenges=challenges,
+        current_difficulty=difficulty
+    )
+
+
 @bp.route('/code/<int:challenge_id>')
 @login_required
 def coding_challenge(challenge_id):
