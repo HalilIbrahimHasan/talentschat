@@ -46,3 +46,4 @@ These settings help reduce timing issues while maintaining compatibility with pr
 - PostgreSQL is recommended for production (SQLite works but has limitations)
 - SECRET_KEY must be set as an environment variable
 
+

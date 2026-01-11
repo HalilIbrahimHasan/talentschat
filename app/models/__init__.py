@@ -5,6 +5,11 @@ from app.models.message import Message, MessageReaction, MessageHighlight, Messa
 from app.models.file import File, Snippet
 from app.models.video import Video, VideoLike, VideoComment, VideoStar
 from app.models.article import Article
+from app.models.learning import (
+    Portal, Lesson, Quiz, QuizQuestion, Task, CodingChallenge,
+    StudentProgress, QuizSubmission, TaskSubmission, CodingSubmission,
+    LeaderboardScore, Comment
+)
 
 __all__ = [
     'User',
@@ -13,6 +18,9 @@ __all__ = [
     'Message', 'MessageReaction', 'MessageHighlight', 'MessagePin',
     'File', 'Snippet',
     'Video', 'VideoLike', 'VideoComment', 'VideoStar',
-    'Article'
+    'Article',
+    'Portal', 'Lesson', 'Quiz', 'QuizQuestion', 'Task', 'CodingChallenge',
+    'StudentProgress', 'QuizSubmission', 'TaskSubmission', 'CodingSubmission',
+    'LeaderboardScore', 'Comment'
 ]
 

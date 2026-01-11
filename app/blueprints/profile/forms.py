@@ -35,3 +35,4 @@ class ChangePasswordForm(FlaskForm):
         if self.new_password.data != confirm_password.data:
             raise ValidationError('Passwords must match.')
 
+

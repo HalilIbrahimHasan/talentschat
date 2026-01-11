@@ -91,3 +91,4 @@ class MessagePin(db.Model):
     def __repr__(self):
         return f'<MessagePin {self.message_id} in {self.channel_id}>'
 
+

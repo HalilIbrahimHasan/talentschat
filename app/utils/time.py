@@ -30,3 +30,4 @@ def format_datetime(dt):
         return ''
     return dt.strftime('%Y-%m-%d %H:%M:%S')
 
+

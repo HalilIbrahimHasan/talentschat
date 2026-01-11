@@ -8,3 +8,4 @@ login_manager = LoginManager()
 socketio = SocketIO()
 csrf = CSRFProtect()
 
+

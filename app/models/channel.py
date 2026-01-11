@@ -49,3 +49,4 @@ class ChannelMember(db.Model):
     def __repr__(self):
         return f'<ChannelMember {self.user_id} in {self.channel_id}>'
 
+

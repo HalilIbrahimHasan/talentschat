@@ -15,6 +15,7 @@ class User(UserMixin, db.Model):
     avatar_url = db.Column(db.String(255), nullable=True)
     profile_image = db.Column(db.String(255), nullable=True)  # Profile image path
     bio = db.Column(db.Text, nullable=True)  # User bio
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)  # Admin flag (only one admin allowed)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationships
