@@ -231,6 +231,45 @@ function endCall() {
         });
     }
     
+    // CRITICAL: Stop ALL video tracks FIRST from localStream (this turns off the camera light)
+    // Do this BEFORE clearing references
+    if (localStream) {
+        localStream.getVideoTracks().forEach(track => {
+            try {
+                track.stop();
+                console.log('✅ Stopped localStream video track:', track.id);
+            } catch (e) {
+                console.warn('Error stopping localStream video track:', e);
+            }
+        });
+        localStream.getAudioTracks().forEach(track => {
+            try {
+                track.stop();
+                console.log('✅ Stopped localStream audio track:', track.id);
+            } catch (e) {
+                console.warn('Error stopping localStream audio track:', e);
+            }
+        });
+    }
+    
+    if (processedLocalStream && processedLocalStream !== localStream) {
+        processedLocalStream.getVideoTracks().forEach(track => {
+            try {
+                track.stop();
+                console.log('✅ Stopped processedLocalStream video track:', track.id);
+            } catch (e) {
+                console.warn('Error stopping processedLocalStream video track:', e);
+            }
+        });
+        processedLocalStream.getAudioTracks().forEach(track => {
+            try {
+                track.stop();
+            } catch (e) {
+                // Ignore
+            }
+        });
+    }
+    
     // Collect ALL streams that might have tracks before clearing references
     const allStreams = new Set();
     if (localStream) allStreams.add(localStream);
@@ -242,6 +281,15 @@ function endCall() {
     const localVideo = document.getElementById('localVideo');
     if (localVideo && localVideo.srcObject) {
         allStreams.add(localVideo.srcObject);
+        // Stop tracks from video element's stream
+        localVideo.srcObject.getVideoTracks().forEach(track => {
+            try {
+                track.stop();
+                console.log('✅ Stopped localVideo element video track:', track.id);
+            } catch (e) {
+                // Already stopped
+            }
+        });
     }
     
     Object.keys(remoteStreams).forEach(userId => {
@@ -251,13 +299,13 @@ function endCall() {
         }
     });
     
-    // CRITICAL: Stop ALL video tracks FIRST (this turns off the camera light)
+    // Stop ALL video tracks from remaining streams
     allStreams.forEach(stream => {
         if (stream) {
             stream.getVideoTracks().forEach(track => {
                 try {
                     track.stop();
-                    console.log('✅ Stopped video track:', track.id, track.kind, track.label);
+                    console.log('✅ Stopped video track:', track.id);
                 } catch (e) {
                     console.warn('Error stopping video track:', e);
                 }

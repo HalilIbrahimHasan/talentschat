@@ -1,11 +1,11 @@
 // Video recording and screen sharing functionality
 
-let mediaRecorder = null;
-let recordedChunks = [];
-let stream = null;
+let recordingMediaRecorder = null;
+let recordingRecordedChunks = [];
+let recordingStream = null;
 let recordingStartTime = null;
 let recordingTimer = null;
-let isRecording = false;
+let isSelfRecording = false; // Changed from isRecording to avoid conflict with calls.js
 let isScreenShare = false;
 
 const MAX_RECORDING_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
@@ -65,12 +65,12 @@ async function startRecording(type) {
         
         // Request media access
         if (type === 'screen') {
-            stream = await navigator.mediaDevices.getDisplayMedia({
+            recordingStream = await navigator.mediaDevices.getDisplayMedia({
                 video: { mediaSource: 'screen' },
                 audio: true
             });
         } else {
-            stream = await navigator.mediaDevices.getUserMedia({
+            recordingStream = await navigator.mediaDevices.getUserMedia({
                 video: true,
                 audio: true
             });
@@ -79,7 +79,7 @@ async function startRecording(type) {
         // Show preview
         const previewVideo = document.getElementById('previewVideo');
         if (previewVideo) {
-            previewVideo.srcObject = stream;
+            previewVideo.srcObject = recordingStream;
             previewVideo.play();
         }
         
@@ -104,28 +104,28 @@ async function startRecording(type) {
             options.mimeType = 'video/webm';
         }
         
-        mediaRecorder = new MediaRecorder(stream, options);
-        recordedChunks = [];
+        recordingMediaRecorder = new MediaRecorder(recordingStream, options);
+        recordingRecordedChunks = [];
         
-        mediaRecorder.ondataavailable = (event) => {
+        recordingMediaRecorder.ondataavailable = (event) => {
             if (event.data.size > 0) {
-                recordedChunks.push(event.data);
+                recordingRecordedChunks.push(event.data);
             }
         };
         
-        mediaRecorder.onstop = () => {
+        recordingMediaRecorder.onstop = () => {
             handleRecordingComplete();
         };
         
-        mediaRecorder.onerror = (event) => {
+        recordingMediaRecorder.onerror = (event) => {
             console.error('MediaRecorder error:', event.error);
             alert('Recording error: ' + event.error.message);
             cancelRecording();
         };
         
         // Start recording
-        mediaRecorder.start(1000); // Collect data every second
-        isRecording = true;
+        recordingMediaRecorder.start(1000); // Collect data every second
+        isSelfRecording = true;
         recordingStartTime = Date.now();
         
         // Start timer
@@ -134,14 +134,14 @@ async function startRecording(type) {
         
         // Auto-stop at 30 minutes
         setTimeout(() => {
-            if (isRecording) {
+            if (isSelfRecording) {
                 stopRecording();
             }
         }, MAX_RECORDING_DURATION);
         
         // Handle stream end (user stops sharing screen)
-        stream.getVideoTracks()[0].addEventListener('ended', () => {
-            if (isRecording) {
+        recordingStream.getVideoTracks()[0].addEventListener('ended', () => {
+            if (isSelfRecording) {
                 stopRecording();
             }
         });
@@ -154,7 +154,7 @@ async function startRecording(type) {
 }
 
 function updateRecordingTimer() {
-    if (!isRecording || !recordingStartTime) return;
+    if (!isSelfRecording || !recordingStartTime) return;
     
     const elapsed = Date.now() - recordingStartTime;
     const minutes = Math.floor(elapsed / 60000);
@@ -176,10 +176,10 @@ function updateRecordingTimer() {
 }
 
 function stopRecording() {
-    if (!isRecording || !mediaRecorder) return;
+    if (!isSelfRecording || !recordingMediaRecorder) return;
     
-    isRecording = false;
-    mediaRecorder.stop();
+    isSelfRecording = false;
+    recordingMediaRecorder.stop();
     
     if (recordingTimer) {
         clearInterval(recordingTimer);
@@ -187,8 +187,8 @@ function stopRecording() {
     }
     
     // Stop all tracks
-    if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+    if (recordingStream) {
+        recordingStream.getTracks().forEach(track => track.stop());
     }
     
     // Hide preview
@@ -199,8 +199,8 @@ function stopRecording() {
 }
 
 function cancelRecording() {
-    if (isRecording) {
-        mediaRecorder.stop();
+    if (isSelfRecording) {
+        recordingMediaRecorder.stop();
     }
     
     if (recordingTimer) {
@@ -208,13 +208,13 @@ function cancelRecording() {
         recordingTimer = null;
     }
     
-    if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        stream = null;
+    if (recordingStream) {
+        recordingStream.getTracks().forEach(track => track.stop());
+        recordingStream = null;
     }
     
-    recordedChunks = [];
-    isRecording = false;
+    recordingRecordedChunks = [];
+    isSelfRecording = false;
     
     const recordingModal = document.getElementById('recordingModal');
     if (recordingModal) {
@@ -233,14 +233,14 @@ function cancelRecording() {
 }
 
 async function handleRecordingComplete() {
-    if (recordedChunks.length === 0) {
+    if (recordingRecordedChunks.length === 0) {
         alert('No recording data available');
         cancelRecording();
         return;
     }
     
     // Create blob from chunks
-    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const blob = new Blob(recordingRecordedChunks, { type: 'video/webm' });
     
     // Check file size (max 200MB)
     const maxSize = 200 * 1024 * 1024;
