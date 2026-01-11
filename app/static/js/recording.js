@@ -12,20 +12,40 @@ const MAX_RECORDING_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
 
 // Initialize recording UI
 function initRecording() {
+    console.log('Initializing recording UI...');
     const recordBtn = document.getElementById('recordBtn');
-    const screenShareBtn = document.getElementById('screenShareBtn');
+    const screenRecordingBtn = document.getElementById('screenRecordingBtn');
     const recordingModal = document.getElementById('recordingModal');
     const stopRecordingBtn = document.getElementById('stopRecordingBtn');
     const cancelRecordingBtn = document.getElementById('cancelRecordingBtn');
     const previewVideo = document.getElementById('previewVideo');
     const recordingTimerEl = document.getElementById('recordingTimer');
     
+    console.log('recordBtn found:', !!recordBtn);
+    console.log('screenRecordingBtn found:', !!screenRecordingBtn);
+    
     if (recordBtn) {
-        recordBtn.addEventListener('click', () => startRecording('camera'));
+        recordBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Record button clicked!');
+            startRecording('camera');
+        });
+        console.log('Record button event listener attached');
+    } else {
+        console.error('Record button not found!');
     }
     
-    if (screenShareBtn) {
-        screenShareBtn.addEventListener('click', () => startRecording('screen'));
+    if (screenRecordingBtn) {
+        screenRecordingBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Screen recording button clicked!');
+            startRecording('screen');
+        });
+        console.log('Screen recording button event listener attached');
+    } else {
+        console.warn('Screen recording button not found!');
     }
     
     if (stopRecordingBtn) {
@@ -35,6 +55,8 @@ function initRecording() {
     if (cancelRecordingBtn) {
         cancelRecordingBtn.addEventListener('click', cancelRecording);
     }
+    
+    console.log('Recording UI initialized');
 }
 
 async function startRecording(type) {

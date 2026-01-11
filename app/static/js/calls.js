@@ -219,6 +219,8 @@ function rejectCall() {
 
 function endCall() {
     callState = null;
+    
+    // Stop recording FIRST and clean up all recording tracks
     if (isRecording) {
         stopCallRecording();
     }
@@ -229,18 +231,48 @@ function endCall() {
         });
     }
     
-    // Clean up video elements FIRST using current remoteStreams
+    // Collect ALL streams that might have tracks before clearing references
+    const allStreams = new Set();
+    if (localStream) allStreams.add(localStream);
+    if (screenShareStream) allStreams.add(screenShareStream);
+    if (processedLocalStream) allStreams.add(processedLocalStream);
+    Object.values(remoteStreams).forEach(s => { if (s) allStreams.add(s); });
+    
+    // Also collect streams from video elements
     const localVideo = document.getElementById('localVideo');
-    if (localVideo) {
-        if (localVideo.srcObject) {
-            // Stop all tracks in the video element's stream
-            const stream = localVideo.srcObject;
-            stream.getTracks().forEach(track => {
+    if (localVideo && localVideo.srcObject) {
+        allStreams.add(localVideo.srcObject);
+    }
+    
+    Object.keys(remoteStreams).forEach(userId => {
+        const remoteVideo = document.getElementById(`remoteVideoStream-${userId}`);
+        if (remoteVideo && remoteVideo.srcObject) {
+            allStreams.add(remoteVideo.srcObject);
+        }
+    });
+    
+    // CRITICAL: Stop ALL video tracks FIRST (this turns off the camera light)
+    allStreams.forEach(stream => {
+        if (stream) {
+            stream.getVideoTracks().forEach(track => {
                 try {
                     track.stop();
-                    console.log('Stopped track from localVideo element:', track.kind);
+                    console.log('✅ Stopped video track:', track.id, track.kind, track.label);
                 } catch (e) {
-                    console.warn('Error stopping track from localVideo:', e);
+                    console.warn('Error stopping video track:', e);
+                }
+            });
+        }
+    });
+    
+    // Clean up video elements
+    if (localVideo) {
+        if (localVideo.srcObject) {
+            localVideo.srcObject.getTracks().forEach(track => {
+                try {
+                    track.stop();
+                } catch (e) {
+                    // Already stopped, ignore
                 }
             });
         }
@@ -251,12 +283,11 @@ function endCall() {
         const remoteVideo = document.getElementById(`remoteVideoStream-${userId}`);
         if (remoteVideo) {
             if (remoteVideo.srcObject) {
-                const stream = remoteVideo.srcObject;
-                stream.getTracks().forEach(track => {
+                remoteVideo.srcObject.getTracks().forEach(track => {
                     try {
                         track.stop();
                     } catch (e) {
-                        // Ignore errors
+                        // Already stopped, ignore
                     }
                 });
             }
@@ -264,7 +295,21 @@ function endCall() {
         }
     });
     
-    // Aggressively stop all tracks in peer connections FIRST
+    // Stop ALL audio tracks
+    allStreams.forEach(stream => {
+        if (stream) {
+            stream.getAudioTracks().forEach(track => {
+                try {
+                    track.stop();
+                    console.log('Stopped audio track:', track.id);
+                } catch (e) {
+                    console.warn('Error stopping audio track:', e);
+                }
+            });
+        }
+    });
+    
+    // Aggressively stop all tracks in peer connections
     Object.values(peerConnections).forEach(pc => {
         try {
             // Stop all sender tracks
@@ -299,31 +344,6 @@ function endCall() {
             pc.close();
         } catch (e) {
             console.warn('Error closing peer connection:', e);
-        }
-        console.log('Closed peer connection');
-    });
-    
-    // Stop ALL media tracks from all streams (comprehensive cleanup)
-    const streamsToStop = [];
-    if (localStream) streamsToStop.push(localStream);
-    if (screenShareStream) streamsToStop.push(screenShareStream);
-    if (processedLocalStream && processedLocalStream !== localStream) streamsToStop.push(processedLocalStream);
-    
-    // Also stop tracks from remote streams
-    Object.values(remoteStreams).forEach(stream => {
-        if (stream) streamsToStop.push(stream);
-    });
-    
-    streamsToStop.forEach(stream => {
-        if (stream) {
-            stream.getTracks().forEach(track => {
-                try {
-                    track.stop();
-                    console.log('Stopped track from stream:', track.kind, track.id);
-                } catch (e) {
-                    console.warn('Error stopping track:', e);
-                }
-            });
         }
     });
     
@@ -367,7 +387,7 @@ function endCall() {
     });
     remoteAudioElements = {};
     
-    console.log('Call ended, all tracks stopped and cameras should be off');
+    console.log('✅ Call ended - ALL cameras should be OFF now');
 }
 
 async function getLocalMedia(type, screenShare) {
@@ -916,14 +936,37 @@ function startCallRecording() {
 }
 
 function stopCallRecording() {
-    if (!mediaRecorder || !isRecording) return;
+    if (!isRecording) return;
     
-    mediaRecorder.stop();
+    console.log('Stopping recording and cleaning up tracks...');
     isRecording = false;
     window.isRecordingCall = false;
-    recordingStartTime = null;
-    updateRecordButton(false);
-    hideRecordingTimer();
+    
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    
+    // CRITICAL: Stop all tracks from recording video elements BEFORE cleanup
+    Object.values(recordingVideoElements).forEach(videoEl => {
+        if (videoEl && videoEl.srcObject) {
+            const stream = videoEl.srcObject;
+            stream.getTracks().forEach(track => {
+                try {
+                    track.stop();
+                    console.log('✅ Stopped recording track:', track.kind, track.id);
+                } catch (e) {
+                    console.warn('Error stopping recording track:', e);
+                }
+            });
+            videoEl.srcObject = null;
+        }
+    });
+    
+    // Stop drawing loop
+    if (recordingAnimationFrame) {
+        cancelAnimationFrame(recordingAnimationFrame);
+        recordingAnimationFrame = null;
+    }
     
     // Stop recording timer
     if (recordingTimerInterval) {
@@ -931,11 +974,38 @@ function stopCallRecording() {
         recordingTimerInterval = null;
     }
     
-    // Stop drawing loop
-    if (recordingAnimationFrame) {
-        cancelAnimationFrame(recordingAnimationFrame);
-        recordingAnimationFrame = null;
+    recordingStartTime = null;
+    updateRecordButton(false);
+    hideRecordingTimer();
+    
+    // Clean up recording canvas and container (tracks already stopped above)
+    if (recordingCanvas) {
+        recordingCanvas = null;
+        recordingContext = null;
     }
+    
+    const recordingContainer = document.getElementById('recordingVideoContainer');
+    if (recordingContainer) {
+        // Remove all child elements
+        while (recordingContainer.firstChild) {
+            const child = recordingContainer.firstChild;
+            if (child.srcObject) {
+                child.srcObject.getTracks().forEach(track => {
+                    try {
+                        track.stop();
+                    } catch (e) {
+                        // Already stopped, ignore
+                    }
+                });
+                child.srcObject = null;
+            }
+            recordingContainer.removeChild(child);
+        }
+    }
+    
+    recordingVideoElements = {};
+    
+    console.log('Recording stopped, all tracks cleaned up');
 }
 
 function updateRecordingTimer() {
