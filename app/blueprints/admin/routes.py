@@ -211,3 +211,68 @@ def learn_dashboard():
         flash(f'Error loading admin dashboard: {str(e)}', 'error')
         # Return empty lists if query fails
         return render_template('admin/learn_dashboard.html', portals=[], coding_challenges=[])
+
+
+# Portal management routes (stubs - to be implemented)
+@bp.route('/portal/create', methods=['GET', 'POST'])
+@login_required
+def create_portal():
+    """Create a new portal - placeholder"""
+    require_admin()
+    flash('Portal creation feature is not yet implemented.', 'info')
+    return redirect(url_for('admin.learn_dashboard'))
+
+
+@bp.route('/portal/<int:portal_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_portal(portal_id):
+    """Edit a portal - placeholder"""
+    require_admin()
+    flash('Portal editing feature is not yet implemented.', 'info')
+    return redirect(url_for('admin.learn_dashboard'))
+
+
+@bp.route('/portal/<int:portal_id>/delete', methods=['POST'])
+@login_required
+def delete_portal(portal_id):
+    """Delete a portal - placeholder"""
+    require_admin()
+    flash('Portal deletion feature is not yet implemented.', 'info')
+    return redirect(url_for('admin.learn_dashboard'))
+
+
+@bp.route('/portal/<int:portal_id>/lessons')
+@login_required
+def portal_lessons(portal_id):
+    """View lessons for a portal - placeholder"""
+    require_admin()
+    flash('Portal lessons view is not yet implemented.', 'info')
+    return redirect(url_for('admin.learn_dashboard'))
+
+
+# Coding challenge management routes (stubs - to be implemented)
+@bp.route('/coding-challenge/create', methods=['GET', 'POST'])
+@login_required
+def create_coding_challenge():
+    """Create a new coding challenge - placeholder"""
+    require_admin()
+    flash('Coding challenge creation feature is not yet implemented.', 'info')
+    return redirect(url_for('admin.learn_dashboard'))
+
+
+@bp.route('/coding-challenge/<int:challenge_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_coding_challenge(challenge_id):
+    """Edit a coding challenge - placeholder"""
+    require_admin()
+    flash('Coding challenge editing feature is not yet implemented.', 'info')
+    return redirect(url_for('admin.learn_dashboard'))
+
+
+@bp.route('/coding-challenge/<int:challenge_id>/delete', methods=['POST'])
+@login_required
+def delete_coding_challenge(challenge_id):
+    """Delete a coding challenge - placeholder"""
+    require_admin()
+    flash('Coding challenge deletion feature is not yet implemented.', 'info')
+    return redirect(url_for('admin.learn_dashboard'))
