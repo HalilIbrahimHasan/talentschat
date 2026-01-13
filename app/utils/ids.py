@@ -21,3 +21,5 @@ def generate_invite_code(length=8):
     return ''.join(secrets.choice(chars) for _ in range(length))
 
 
+
+

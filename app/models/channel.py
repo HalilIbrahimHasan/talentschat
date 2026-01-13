@@ -50,3 +50,5 @@ class ChannelMember(db.Model):
         return f'<ChannelMember {self.user_id} in {self.channel_id}>'
 
 
+
+

@@ -74,3 +74,5 @@ If you want to use Python 3.11 instead of 3.13 (better compatibility), you can a
 But Python 3.13 should work fine now that Pillow is updated.
 
 
+
+

@@ -459,3 +459,5 @@ if __name__ == '__main__':
             print(f"✓ Added {added} new challenges to database")
             print(f"Total challenges now: {CodingChallenge.query.count()}")
 
+
+
