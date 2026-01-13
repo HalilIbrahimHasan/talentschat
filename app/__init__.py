@@ -19,9 +19,10 @@ def create_app(config_class=Config):
         }
     else:
         # For PostgreSQL, use pool settings compatible with eventlet
+        # Use NullPool for eventlet to avoid threading issues
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'poolclass': NullPool,
             'pool_pre_ping': True,
-            'pool_recycle': 3600,
         }
     
     # Initialize extensions
