@@ -199,3 +199,15 @@ def add_challenges():
 def learn_dashboard():
     """Admin dashboard for learning content"""
     require_admin()
+    try:
+        portals = Portal.query.order_by(Portal.id).all()
+        coding_challenges = CodingChallenge.query.filter_by(is_active=True).order_by(CodingChallenge.id).all()
+        return render_template('admin/learn_dashboard.html', portals=portals, coding_challenges=coding_challenges)
+    except Exception as e:
+        import traceback
+        # Log error and return friendly message
+        print(f"Error in learn_dashboard: {e}")
+        print(traceback.format_exc())
+        flash(f'Error loading admin dashboard: {str(e)}', 'error')
+        # Return empty lists if query fails
+        return render_template('admin/learn_dashboard.html', portals=[], coding_challenges=[])
