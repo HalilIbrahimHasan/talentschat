@@ -29,3 +29,5 @@ You can change the admin password by:
 - Keep the admin credentials secure
 - The admin account has full access to create/edit/delete all learning content
 
+
+

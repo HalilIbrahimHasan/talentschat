@@ -18,7 +18,9 @@ def allowed_file(filename, allowed_extensions):
 
 def save_profile_image(file):
     """Save profile image and return the filename"""
-    if file and file.filename:
+    # Check if file is a FileStorage object (has filename attribute)
+    # If it's a string, it means no new file was uploaded
+    if file and hasattr(file, 'filename') and file.filename:
         filename = secure_filename(file.filename)
         # Create unique filename
         ext = filename.rsplit('.', 1)[1].lower()

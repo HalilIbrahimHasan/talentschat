@@ -48,3 +48,5 @@ with app.app_context():
         print("\nAdmin user created/updated successfully!")
         print("You can now log in with these credentials to access the admin panel.")
 
+
+
