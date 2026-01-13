@@ -213,41 +213,302 @@ def learn_dashboard():
         return render_template('admin/learn_dashboard.html', portals=[], coding_challenges=[])
 
 
-# Portal management routes (stubs - to be implemented)
+# Portal management routes
 @bp.route('/portal/create', methods=['GET', 'POST'])
 @login_required
 def create_portal():
-    """Create a new portal - placeholder"""
+    """Create a new portal"""
     require_admin()
-    flash('Portal creation feature is not yet implemented.', 'info')
-    return redirect(url_for('admin.learn_dashboard'))
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        description = request.form.get('description', '').strip()
+        
+        if not name:
+            flash('Portal name is required.', 'error')
+            return render_template('admin/portal_form.html', portal=None)
+        
+        portal = Portal(name=name, description=description if description else None)
+        db.session.add(portal)
+        db.session.commit()
+        
+        flash(f'Portal "{name}" created successfully!', 'success')
+        return redirect(url_for('admin.portal_lessons', portal_id=portal.id))
+    
+    return render_template('admin/portal_form.html', portal=None)
 
 
 @bp.route('/portal/<int:portal_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_portal(portal_id):
-    """Edit a portal - placeholder"""
+    """Edit a portal"""
     require_admin()
-    flash('Portal editing feature is not yet implemented.', 'info')
-    return redirect(url_for('admin.learn_dashboard'))
+    portal = Portal.query.get_or_404(portal_id)
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        description = request.form.get('description', '').strip()
+        
+        if not name:
+            flash('Portal name is required.', 'error')
+            return render_template('admin/portal_form.html', portal=portal)
+        
+        portal.name = name
+        portal.description = description if description else None
+        db.session.commit()
+        
+        flash(f'Portal "{name}" updated successfully!', 'success')
+        return redirect(url_for('admin.learn_dashboard'))
+    
+    return render_template('admin/portal_form.html', portal=portal)
 
 
 @bp.route('/portal/<int:portal_id>/delete', methods=['POST'])
 @login_required
 def delete_portal(portal_id):
-    """Delete a portal - placeholder"""
+    """Delete a portal"""
     require_admin()
-    flash('Portal deletion feature is not yet implemented.', 'info')
+    portal = Portal.query.get_or_404(portal_id)
+    portal_name = portal.name
+    
+    db.session.delete(portal)
+    db.session.commit()
+    
+    flash(f'Portal "{portal_name}" deleted successfully!', 'success')
     return redirect(url_for('admin.learn_dashboard'))
 
 
 @bp.route('/portal/<int:portal_id>/lessons')
 @login_required
 def portal_lessons(portal_id):
-    """View lessons for a portal - placeholder"""
+    """View lessons for a portal"""
     require_admin()
-    flash('Portal lessons view is not yet implemented.', 'info')
-    return redirect(url_for('admin.learn_dashboard'))
+    portal = Portal.query.get_or_404(portal_id)
+    lessons = Lesson.query.filter_by(portal_id=portal_id).order_by(Lesson.order_index, Lesson.id).all()
+    
+    return render_template('admin/portal_lessons.html', portal=portal, lessons=lessons)
+
+
+# Lesson management routes
+@bp.route('/lesson/create/<int:portal_id>', methods=['GET', 'POST'])
+@login_required
+def create_lesson(portal_id):
+    """Create a new lesson"""
+    require_admin()
+    portal = Portal.query.get_or_404(portal_id)
+    
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '').strip()
+        youtube_url = request.form.get('youtube_url', '').strip()
+        points_complete = int(request.form.get('points_complete', 10) or 10)
+        order_index = int(request.form.get('order_index', 0) or 0)
+        
+        if not title:
+            flash('Lesson title is required.', 'error')
+            return render_template('admin/lesson_form.html', portal=portal, lesson=None)
+        
+        youtube_id = extract_youtube_id(youtube_url) if youtube_url else None
+        
+        lesson = Lesson(
+            portal_id=portal_id,
+            title=title,
+            description=description if description else None,
+            youtube_url=youtube_url if youtube_url else None,
+            youtube_id=youtube_id,
+            points_complete=points_complete,
+            order_index=order_index,
+            is_active=True
+        )
+        db.session.add(lesson)
+        db.session.commit()
+        
+        flash(f'Lesson "{title}" created successfully!', 'success')
+        return redirect(url_for('admin.portal_lessons', portal_id=portal_id))
+    
+    return render_template('admin/lesson_form.html', portal=portal, lesson=None)
+
+
+@bp.route('/lesson/<int:lesson_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_lesson(lesson_id):
+    """Edit a lesson"""
+    require_admin()
+    lesson = Lesson.query.get_or_404(lesson_id)
+    portal = lesson.portal
+    
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '').strip()
+        youtube_url = request.form.get('youtube_url', '').strip()
+        points_complete = int(request.form.get('points_complete', 10) or 10)
+        order_index = int(request.form.get('order_index', 0) or 0)
+        
+        if not title:
+            flash('Lesson title is required.', 'error')
+            return render_template('admin/lesson_form.html', portal=portal, lesson=lesson)
+        
+        lesson.title = title
+        lesson.description = description if description else None
+        lesson.youtube_url = youtube_url if youtube_url else None
+        lesson.youtube_id = extract_youtube_id(youtube_url) if youtube_url else None
+        lesson.points_complete = points_complete
+        lesson.order_index = order_index
+        db.session.commit()
+        
+        flash(f'Lesson "{title}" updated successfully!', 'success')
+        return redirect(url_for('admin.portal_lessons', portal_id=portal.id))
+    
+    return render_template('admin/lesson_form.html', portal=portal, lesson=lesson)
+
+
+@bp.route('/lesson/<int:lesson_id>/delete', methods=['POST'])
+@login_required
+def delete_lesson(lesson_id):
+    """Delete a lesson"""
+    require_admin()
+    lesson = Lesson.query.get_or_404(lesson_id)
+    portal_id = lesson.portal_id
+    lesson_title = lesson.title
+    
+    db.session.delete(lesson)
+    db.session.commit()
+    
+    flash(f'Lesson "{lesson_title}" deleted successfully!', 'success')
+    return redirect(url_for('admin.portal_lessons', portal_id=portal_id))
+
+
+# Quiz management routes
+@bp.route('/lesson/<int:lesson_id>/quiz', methods=['GET', 'POST'])
+@login_required
+def manage_quiz(lesson_id):
+    """Manage quiz for a lesson"""
+    require_admin()
+    lesson = Lesson.query.get_or_404(lesson_id)
+    quiz = Quiz.query.filter_by(lesson_id=lesson_id).first()
+    
+    if request.method == 'POST':
+        quiz_title = request.form.get('quiz_title', '').strip()
+        if not quiz_title:
+            flash('Quiz title is required.', 'error')
+        else:
+            if quiz:
+                quiz.title = quiz_title
+            else:
+                quiz = Quiz(lesson_id=lesson_id, title=quiz_title)
+                db.session.add(quiz)
+            db.session.commit()
+            flash('Quiz saved successfully!', 'success')
+            return redirect(url_for('admin.manage_quiz', lesson_id=lesson_id))
+    
+    questions = QuizQuestion.query.filter_by(quiz_id=quiz.id).order_by(QuizQuestion.order_index, QuizQuestion.id).all() if quiz else []
+    
+    return render_template('admin/quiz_form.html', lesson=lesson, quiz=quiz, questions=questions)
+
+
+@bp.route('/quiz/<int:quiz_id>/question/add', methods=['POST'])
+@login_required
+def add_quiz_question(quiz_id):
+    """Add a question to a quiz"""
+    require_admin()
+    quiz = Quiz.query.get_or_404(quiz_id)
+    
+    question_text = request.form.get('question_text', '').strip()
+    option_a = request.form.get('option_a', '').strip()
+    option_b = request.form.get('option_b', '').strip()
+    option_c = request.form.get('option_c', '').strip()
+    option_d = request.form.get('option_d', '').strip()
+    correct_option = request.form.get('correct_option', 'A').upper()
+    points = int(request.form.get('points', 1) or 1)
+    order_index = int(request.form.get('order_index', 0) or 0)
+    
+    if not question_text or not option_a or not option_b:
+        flash('Question text, option A, and option B are required.', 'error')
+        return redirect(url_for('admin.manage_quiz', lesson_id=quiz.lesson_id))
+    
+    if correct_option not in ['A', 'B', 'C', 'D']:
+        flash('Correct option must be A, B, C, or D.', 'error')
+        return redirect(url_for('admin.manage_quiz', lesson_id=quiz.lesson_id))
+    
+    question = QuizQuestion(
+        quiz_id=quiz_id,
+        question_text=question_text,
+        option_a=option_a,
+        option_b=option_b,
+        option_c=option_c if option_c else None,
+        option_d=option_d if option_d else None,
+        correct_option=correct_option,
+        points=points,
+        order_index=order_index
+    )
+    db.session.add(question)
+    db.session.flush()
+    update_quiz_total_points(quiz_id)
+    db.session.commit()
+    
+    flash('Question added successfully!', 'success')
+    return redirect(url_for('admin.manage_quiz', lesson_id=quiz.lesson_id))
+
+
+@bp.route('/quiz/question/<int:question_id>/delete', methods=['POST'])
+@login_required
+def delete_quiz_question(question_id):
+    """Delete a quiz question"""
+    require_admin()
+    question = QuizQuestion.query.get_or_404(question_id)
+    quiz_id = question.quiz_id
+    lesson_id = Quiz.query.get_or_404(quiz_id).lesson_id
+    
+    db.session.delete(question)
+    db.session.flush()
+    update_quiz_total_points(quiz_id)
+    db.session.commit()
+    
+    flash('Question deleted successfully!', 'success')
+    return redirect(url_for('admin.manage_quiz', lesson_id=lesson_id))
+
+
+# Task management routes
+@bp.route('/lesson/<int:lesson_id>/task/add', methods=['POST'])
+@login_required
+def add_task(lesson_id):
+    """Add a task to a lesson"""
+    require_admin()
+    lesson = Lesson.query.get_or_404(lesson_id)
+    
+    task_text = request.form.get('task_text', '').strip()
+    points = int(request.form.get('points', 5) or 5)
+    
+    if not task_text:
+        flash('Task text is required.', 'error')
+        return redirect(url_for('admin.portal_lessons', portal_id=lesson.portal_id))
+    
+    task = Task(
+        lesson_id=lesson_id,
+        task_text=task_text,
+        points=points,
+        is_optional=False,
+        order_index=0
+    )
+    db.session.add(task)
+    db.session.commit()
+    
+    flash('Task added successfully!', 'success')
+    return redirect(url_for('admin.portal_lessons', portal_id=lesson.portal_id))
+
+
+@bp.route('/task/<int:task_id>/delete', methods=['POST'])
+@login_required
+def delete_task(task_id):
+    """Delete a task"""
+    require_admin()
+    task = Task.query.get_or_404(task_id)
+    portal_id = task.lesson.portal_id
+    
+    db.session.delete(task)
+    db.session.commit()
+    
+    flash('Task deleted successfully!', 'success')
+    return redirect(url_for('admin.portal_lessons', portal_id=portal_id))
 
 
 # Coding challenge management routes (stubs - to be implemented)
