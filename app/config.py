@@ -7,11 +7,8 @@ basedir = Path(__file__).parent.parent
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     
-    # Handle DATABASE_URL (may include postgres:// which needs to be postgresql://)
-    database_url = os.environ.get('DATABASE_URL') or f'sqlite:///{basedir / "app.db"}'
-    if database_url.startswith('postgres://'):
-        database_url = database_url.replace('postgres://', 'postgresql://', 1)
-    SQLALCHEMY_DATABASE_URI = database_url
+    # SQLite-only (Postgres disabled)
+    SQLALCHEMY_DATABASE_URI = f'sqlite:///{basedir / "app.db"}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Note: SQLALCHEMY_ENGINE_OPTIONS is set dynamically in app/__init__.py
