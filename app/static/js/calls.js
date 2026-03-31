@@ -19,7 +19,8 @@ let recordingAnimationFrame = null;
 let recordingStartTime = null;
 let recordingTimerInterval = null;
 let isCallModalMinimized = false;
-let remoteAudioElements = {}; // {userId: HTMLAudioElement}
+// Audio is fully disabled (no mic capture, no remote audio elements)
+let remoteAudioElements = {}; // kept for backward-compat cleanup in endCall()
 let callState = null; // 'calling', 'incoming', 'active'
 let recordingVideoElements = {}; // Store video elements used for recording
 
@@ -120,6 +121,10 @@ function initCalls() {
 }
 
 async function initiateCall(userId, userName, type) {
+    if (type === 'audio') {
+        alert('Audio calls are disabled.');
+        return;
+    }
     if (currentCall) {
         alert('You are already in a call');
         return;
@@ -171,6 +176,11 @@ function handleIncomingCall(data) {
 
 async function acceptCall() {
     if (!currentCall) return;
+    if (currentCallType === 'audio') {
+        alert('Audio calls are disabled.');
+        endCall();
+        return;
+    }
     
     callState = 'active';
     stopRingtone();
@@ -460,7 +470,7 @@ function endCall() {
 async function getLocalMedia(type, screenShare) {
     try {
         const constraints = {
-            audio: true,
+            audio: false,
             video: screenShare ? {
                 mediaSource: 'screen'
             } : type === 'video' ? {
@@ -472,7 +482,7 @@ async function getLocalMedia(type, screenShare) {
         
         let stream;
         if (screenShare) {
-            stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+            stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
         } else {
             stream = await navigator.mediaDevices.getUserMedia(constraints);
         }
@@ -657,7 +667,7 @@ async function startScreenShare() {
     try {
         screenShareStream = await navigator.mediaDevices.getDisplayMedia({
             video: true,
-            audio: true
+            audio: false
         });
         
         isScreenSharing = true;
@@ -898,38 +908,14 @@ function startCallRecording() {
         // Create canvas stream
         const combinedStream = recordingCanvas.captureStream(30);
         
-        // Combine audio from all streams using AudioContext
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const destination = audioContext.createMediaStreamDestination();
-        
-        // Add local audio
-        const localStreamToUse = isScreenSharing ? screenShareStream : (processedLocalStream || localStream);
-        if (localStreamToUse && localStreamToUse.getAudioTracks().length > 0) {
-            const localAudioSource = audioContext.createMediaStreamSource(localStreamToUse);
-            localAudioSource.connect(destination);
-        }
-        
-        // Add remote audios
-        Object.values(remoteStreams).forEach(stream => {
-            if (stream && stream.getAudioTracks().length > 0) {
-                const remoteAudioSource = audioContext.createMediaStreamSource(stream);
-                remoteAudioSource.connect(destination);
-            }
-        });
-        
-        // Add combined audio to canvas stream
-        destination.stream.getAudioTracks().forEach(track => {
-            combinedStream.addTrack(track);
-        });
-        
         // Start recording
         recordedChunks = [];
         const options = {
-            mimeType: 'video/webm;codecs=vp9,opus',
+            mimeType: 'video/webm;codecs=vp9',
             videoBitsPerSecond: 2500000
         };
         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-            options.mimeType = 'video/webm;codecs=vp8,opus';
+            options.mimeType = 'video/webm;codecs=vp8';
         }
         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
             options.mimeType = 'video/webm';
@@ -968,11 +954,6 @@ function startCallRecording() {
             const recordingContainer = document.getElementById('recordingVideoContainer');
             if (recordingContainer) {
                 recordingContainer.innerHTML = '';
-            }
-            
-            // Close audio context
-            if (audioContext) {
-                audioContext.close().catch(console.error);
             }
             
             const blob = new Blob(recordedChunks, { type: 'video/webm' });
@@ -1183,23 +1164,7 @@ Compatible with: VLC Media Player, Chrome, Firefox, Edge, and most modern video 
 }
 
 function toggleMute() {
-    if (!localStream) return;
-    
-    const audioTracks = localStream.getAudioTracks();
-    audioTracks.forEach(track => {
-        track.enabled = !track.enabled;
-    });
-    
-    const muteBtn = document.getElementById('muteBtn');
-    if (muteBtn) {
-        if (audioTracks[0] && audioTracks[0].enabled) {
-            muteBtn.innerHTML = '<i class="fas fa-microphone text-lg"></i>';
-            muteBtn.title = 'Mute';
-        } else {
-            muteBtn.innerHTML = '<i class="fas fa-microphone-slash text-lg"></i>';
-            muteBtn.title = 'Unmute';
-        }
-    }
+    // Audio disabled
 }
 
 async function stopCamera() {
@@ -1364,11 +1329,11 @@ function showCallModal(state, userName, type) {
         status.textContent = 'Waiting for answer...';
     } else if (state === 'incoming') {
         callState = 'incoming';
-        title.textContent = `Incoming ${type === 'video' ? 'Video' : 'Audio'} Call`;
+        title.textContent = `Incoming Video Call`;
         status.textContent = `${userName} is calling you...`;
     } else if (state === 'active') {
         callState = 'active';
-        title.textContent = `${type === 'video' ? 'Video' : 'Audio'} Call`;
+        title.textContent = `Video Call`;
         status.textContent = 'Connected';
         updateCallUI();
     }
@@ -1419,9 +1384,9 @@ function updateCallButtons() {
     // For active calls: show all controls
     // For calling state: show end button only
     if (endBtn) endBtn.classList.toggle('hidden', !isActive && !isCalling);
-    if (muteBtn) muteBtn.classList.toggle('hidden', !isActive || currentCallType === 'audio');
-    if (videoBtn) videoBtn.classList.toggle('hidden', !isActive || currentCallType === 'audio');
-    if (screenShareBtn) screenShareBtn.classList.toggle('hidden', !isActive || currentCallType === 'audio');
+    if (muteBtn) muteBtn.classList.add('hidden');
+    if (videoBtn) videoBtn.classList.toggle('hidden', !isActive);
+    if (screenShareBtn) screenShareBtn.classList.toggle('hidden', !isActive);
     if (recordBtn) recordBtn.classList.toggle('hidden', !isActive);
     if (minimizeBtn) minimizeBtn.classList.toggle('hidden', !isActive && !isCalling);
     if (addParticipantBtn) addParticipantBtn.classList.toggle('hidden', !isActive);
@@ -1431,11 +1396,7 @@ function updateCallUI() {
     const videoGrid = document.getElementById('videoGrid');
     if (!videoGrid) return;
     
-    if (currentCallType === 'video') {
-        updateVideoGrid();
-    } else {
-        updateAudioCallUI();
-    }
+    updateVideoGrid();
 }
 
 function updateVideoGrid() {
@@ -1484,50 +1445,7 @@ function updateVideoGrid() {
 }
 
 function updateAudioCallUI() {
-    const videoGrid = document.getElementById('videoGrid');
-    if (!videoGrid) return;
-    
-    videoGrid.innerHTML = `
-        <div class="col-span-2 flex flex-col items-center justify-center space-y-4 py-8">
-            <div class="w-32 h-32 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-4xl font-bold">
-                ${currentCall.participants.find(p => !p.isLocal)?.name?.[0] || '?'}
-            </div>
-            <div class="text-white text-xl font-semibold">
-                ${currentCall.participants.find(p => !p.isLocal)?.name || 'Participant'}
-            </div>
-            <div class="text-white/70 text-sm">Audio Call</div>
-        </div>
-    `;
-    videoGrid.className = 'grid grid-cols-1 gap-4';
-    
-    // Create/update audio elements for remote streams
-    Object.keys(remoteStreams).forEach(userId => {
-        if (!remoteAudioElements[userId]) {
-            const audio = document.createElement('audio');
-            audio.autoplay = true;
-            audio.playsInline = true;
-            audio.id = `remoteAudio-${userId}`;
-            audio.style.display = 'none';
-            document.body.appendChild(audio);
-            remoteAudioElements[userId] = audio;
-        }
-        
-        const audio = remoteAudioElements[userId];
-        audio.srcObject = remoteStreams[userId];
-        audio.play().catch(err => {
-            console.error('Error playing remote audio:', err);
-        });
-    });
-    
-    // Remove audio elements for users who left
-    Object.keys(remoteAudioElements).forEach(userId => {
-        if (!remoteStreams[userId]) {
-            const audio = remoteAudioElements[userId];
-            audio.srcObject = null;
-            audio.remove();
-            delete remoteAudioElements[userId];
-        }
-    });
+    // Audio disabled
 }
 
 function updateLocalVideo() {
@@ -1564,24 +1482,7 @@ function updateRemoteVideo(userId, stream) {
         };
     }
     
-    // Handle audio streams for audio-only calls
-    if (currentCallType === 'audio') {
-        if (!remoteAudioElements[userId]) {
-            const audio = document.createElement('audio');
-            audio.autoplay = true;
-            audio.playsInline = true;
-            audio.id = `remoteAudio-${userId}`;
-            audio.style.display = 'none';
-            document.body.appendChild(audio);
-            remoteAudioElements[userId] = audio;
-        }
-        
-        const audio = remoteAudioElements[userId];
-        audio.srcObject = stream;
-        audio.play().catch(err => {
-            console.error('Error playing remote audio:', err);
-        });
-    }
+    // Audio disabled
 }
 
 function playRingtone() {
