@@ -665,6 +665,9 @@ function handleIceCandidate(data) {
 
 async function startScreenShare() {
     try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            throw new Error('Screen sharing is not supported on this browser/device.');
+        }
         screenShareStream = await navigator.mediaDevices.getDisplayMedia({
             video: true,
             audio: false
@@ -686,6 +689,24 @@ async function startScreenShare() {
         // Update UI
         updateScreenShareButton(true);
         updateLocalVideo();
+
+        // iOS: fullscreen often requires a direct user gesture.
+        // Still, we can make it easy: tapping the local video will fullscreen it.
+        const localVideo = document.getElementById('localVideo');
+        if (localVideo) {
+            localVideo.addEventListener('click', () => {
+                try {
+                    if (typeof localVideo.webkitEnterFullscreen === 'function') {
+                        localVideo.webkitEnterFullscreen();
+                        return;
+                    }
+                    if (localVideo.requestFullscreen) localVideo.requestFullscreen();
+                    else if (localVideo.webkitRequestFullscreen) localVideo.webkitRequestFullscreen();
+                } catch (e) {
+                    // ignore
+                }
+            }, { once: true });
+        }
         
         // Handle screen share end
         screenShareStream.getVideoTracks()[0].onended = () => {
