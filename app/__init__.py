@@ -10,6 +10,8 @@ def create_app(config_class=Config):
     # Configure SQLAlchemy engine options for eventlet compatibility
     from sqlalchemy.pool import NullPool
     import os
+    import time
+    from sqlalchemy.exc import OperationalError
     database_url = app.config.get('SQLALCHEMY_DATABASE_URI', '')
     if database_url.startswith('sqlite'):
         # For SQLite with eventlet, use NullPool to avoid threading issues
@@ -20,9 +22,20 @@ def create_app(config_class=Config):
     else:
         # For PostgreSQL, use pool settings compatible with eventlet
         # Use NullPool for eventlet to avoid threading issues
+        # Force SSL on managed Postgres (Render closes non-SSL / flaky SSL handshakes)
+        sslmode = os.environ.get('PGSSLMODE', 'require')
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
             'poolclass': NullPool,
             'pool_pre_ping': True,
+            'connect_args': {
+                'sslmode': sslmode,
+                'connect_timeout': int(os.environ.get('DB_CONNECT_TIMEOUT', '10')),
+                # Keepalives help prevent idle SSL disconnects in some environments
+                'keepalives': 1,
+                'keepalives_idle': int(os.environ.get('DB_KEEPALIVES_IDLE', '30')),
+                'keepalives_interval': int(os.environ.get('DB_KEEPALIVES_INTERVAL', '10')),
+                'keepalives_count': int(os.environ.get('DB_KEEPALIVES_COUNT', '5')),
+            },
         }
     
     # Initialize extensions
@@ -113,7 +126,20 @@ def create_app(config_class=Config):
     
     # Create tables and migrate schema
     with app.app_context():
-        db.create_all()
+        # On Render, Postgres may briefly reject connections during deploys.
+        # Retry a few times to avoid crashing the web process on transient SSL closes.
+        max_attempts = int(os.environ.get('DB_INIT_MAX_ATTEMPTS', '5'))
+        base_sleep = float(os.environ.get('DB_INIT_SLEEP_SECONDS', '0.8'))
+        for attempt in range(1, max_attempts + 1):
+            try:
+                db.create_all()
+                break
+            except OperationalError as e:
+                if database_url.startswith('sqlite') or attempt == max_attempts:
+                    raise
+                sleep_for = base_sleep * (2 ** (attempt - 1))
+                print(f"DB init attempt {attempt}/{max_attempts} failed, retrying in {sleep_for:.1f}s: {e}")
+                time.sleep(sleep_for)
         
         # Migrate existing tables (SQLite-specific migrations)
         # Only run if using SQLite, skip for PostgreSQL

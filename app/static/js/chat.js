@@ -130,11 +130,6 @@ function addMessageToUI(message) {
                 <div class="flex items-center space-x-2">
                     <a href="/profile/${message.user_id}" class="text-sm font-bold ${isOwn ? 'text-indigo-700' : 'text-gray-900'} hover:underline transition">${message.user_name}</a>
                     ${!isOwn ? `
-                    <button onclick="if (typeof initiateCall !== 'undefined') { initiateCall(${message.user_id}, '${escapeHtml(message.user_name)}', 'audio'); }" 
-                            class="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition text-xs" 
-                            title="Audio call">
-                        <i class="fas fa-phone"></i>
-                    </button>
                     <button onclick="if (typeof initiateCall !== 'undefined') { initiateCall(${message.user_id}, '${escapeHtml(message.user_name)}', 'video'); }" 
                             class="p-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg transition text-xs" 
                             title="Video call">
@@ -714,11 +709,6 @@ function updateOnlineUsers(users) {
                     <span class="text-white/90 hover:text-white font-medium">${escapeHtml(user.name)}</span>
                 </a>
                 <div class="flex space-x-1">
-                    <button onclick="if (typeof initiateCall !== 'undefined') { initiateCall(${user.id}, '${escapeHtml(user.name)}', 'audio'); }" 
-                            class="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition shadow-md hover:shadow-lg" 
-                            title="Audio call">
-                        <i class="fas fa-phone text-xs"></i>
-                    </button>
                     <button onclick="if (typeof initiateCall !== 'undefined') { initiateCall(${user.id}, '${escapeHtml(user.name)}', 'video'); }" 
                             class="p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition shadow-md hover:shadow-lg" 
                             title="Video call">

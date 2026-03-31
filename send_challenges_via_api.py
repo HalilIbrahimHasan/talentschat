@@ -85,24 +85,42 @@ def auto_login_and_send(base_url=BASE_URL, email=ADMIN_EMAIL, password=ADMIN_PAS
     login_url = f"{base_url}/auth/login"
     
     try:
-        # Get the login page first to get CSRF token (if needed)
+        # Get the login page first to get CSRF token
         login_page = session.get(login_url)
         
-        # Login
+        # Extract CSRF token from the page
+        import re
+        csrf_token_match = re.search(r'name="csrf_token"\s+type="hidden"\s+value="([^"]+)"', login_page.text)
+        if not csrf_token_match:
+            csrf_token_match = re.search(r'id="csrf_token"\s+name="csrf_token"\s+type="hidden"\s+value="([^"]+)"', login_page.text)
+        
+        csrf_token = csrf_token_match.group(1) if csrf_token_match else None
+        
+        if not csrf_token:
+            print("❌ Could not find CSRF token in login page")
+            return False
+        
+        # Login with CSRF token and referrer header
         login_data = {
             "email": email,
             "password": password,
-            "remember_me": False
+            "remember_me": False,
+            "csrf_token": csrf_token
         }
         
-        login_response = session.post(login_url, data=login_data, allow_redirects=False)
+        headers = {
+            "Referer": login_url,
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        
+        login_response = session.post(login_url, data=login_data, headers=headers, allow_redirects=False)
         
         if login_response.status_code in [302, 200]:
             print("✅ Login successful!")
             return send_challenges_via_api(session, base_url)
         else:
             print(f"❌ Login failed: {login_response.status_code}")
-            print(f"   Response: {login_response.text[:200]}")
+            print(f"   Response: {login_response.text[:300]}")
             return False
             
     except requests.exceptions.RequestException as e:

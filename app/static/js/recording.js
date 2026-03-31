@@ -76,13 +76,13 @@ async function startRecording(type) {
         if (type === 'screen') {
             recordingStream = await navigator.mediaDevices.getDisplayMedia({
                 video: { mediaSource: 'screen' },
-                audio: true
+                audio: false
             });
         } else {
             console.log('Calling getUserMedia for camera...');
             recordingStream = await navigator.mediaDevices.getUserMedia({
                 video: true,
-                audio: true
+                audio: false
             });
             console.log('getUserMedia succeeded, stream obtained:', recordingStream);
         }
@@ -102,13 +102,13 @@ async function startRecording(type) {
         
         // Setup MediaRecorder
         const options = {
-            mimeType: 'video/webm;codecs=vp9,opus',
+            mimeType: 'video/webm;codecs=vp9',
             videoBitsPerSecond: 2500000 // 2.5 Mbps for good quality
         };
         
         // Fallback to webm if vp9 not supported
         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-            options.mimeType = 'video/webm;codecs=vp8,opus';
+            options.mimeType = 'video/webm;codecs=vp8';
         }
         
         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
