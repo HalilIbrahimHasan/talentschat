@@ -19,6 +19,7 @@ function initRecording() {
     const stopRecordingBtn = document.getElementById('stopRecordingBtn');
     const cancelRecordingBtn = document.getElementById('cancelRecordingBtn');
     const previewVideo = document.getElementById('previewVideo');
+    const fullscreenPreviewBtn = document.getElementById('fullscreenPreviewBtn');
     const recordingTimerEl = document.getElementById('recordingTimer');
     
     console.log('recordBtn found:', !!recordBtn);
@@ -62,8 +63,58 @@ function initRecording() {
     if (cancelRecordingBtn) {
         cancelRecordingBtn.addEventListener('click', cancelRecording);
     }
+
+    if (fullscreenPreviewBtn && previewVideo) {
+        fullscreenPreviewBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            requestVideoFullscreen(previewVideo);
+        });
+    }
     
     console.log('Recording UI initialized');
+}
+
+function requestVideoFullscreen(videoEl) {
+    if (!videoEl) return;
+    try {
+        // iOS Safari uses a special fullscreen API on <video>
+        if (typeof videoEl.webkitEnterFullscreen === 'function') {
+            videoEl.webkitEnterFullscreen();
+            return;
+        }
+        const container = videoEl.closest('#recordingModal') || videoEl;
+        if (container.requestFullscreen) container.requestFullscreen();
+        else if (container.webkitRequestFullscreen) container.webkitRequestFullscreen();
+    } catch (e) {
+        console.warn('Fullscreen request failed:', e);
+    }
+}
+
+function pickBestRecordingMimeType() {
+    // Safari iOS often supports MP4; Chrome/Firefox typically support WebM.
+    const candidates = [
+        'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
+        'video/mp4',
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm'
+    ];
+    for (const t of candidates) {
+        try {
+            if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
+        } catch (e) {
+            // ignore
+        }
+    }
+    return '';
+}
+
+function extensionForMimeType(mimeType) {
+    const mt = (mimeType || '').toLowerCase();
+    if (mt.includes('video/mp4')) return 'mp4';
+    if (mt.includes('video/webm')) return 'webm';
+    return 'webm';
 }
 
 async function startRecording(type) {
@@ -74,10 +125,11 @@ async function startRecording(type) {
         // Request media access
         console.log('Requesting media access...');
         if (type === 'screen') {
-            recordingStream = await navigator.mediaDevices.getDisplayMedia({
-                video: { mediaSource: 'screen' },
-                audio: false
-            });
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                throw new Error('Screen sharing is not supported on this browser/device.');
+            }
+            // iOS Safari is picky about constraints; keep it simple.
+            recordingStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
         } else {
             console.log('Calling getUserMedia for camera...');
             recordingStream = await navigator.mediaDevices.getUserMedia({
@@ -91,7 +143,11 @@ async function startRecording(type) {
         const previewVideo = document.getElementById('previewVideo');
         if (previewVideo) {
             previewVideo.srcObject = recordingStream;
-            previewVideo.play();
+            previewVideo.muted = true;
+            previewVideo.playsInline = true;
+            previewVideo.play().catch(() => {
+                // iOS may block autoplay; user can tap Fullscreen/Play.
+            });
         }
         
         // Show recording modal
@@ -101,20 +157,10 @@ async function startRecording(type) {
         }
         
         // Setup MediaRecorder
-        const options = {
-            mimeType: 'video/webm;codecs=vp9',
-            videoBitsPerSecond: 2500000 // 2.5 Mbps for good quality
-        };
-        
-        // Fallback to webm if vp9 not supported
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-            options.mimeType = 'video/webm;codecs=vp8';
-        }
-        
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-            options.mimeType = 'video/webm';
-        }
-        
+        const mimeType = pickBestRecordingMimeType();
+        const options = { videoBitsPerSecond: 2500000 };
+        if (mimeType) options.mimeType = mimeType;
+
         recordingMediaRecorder = new MediaRecorder(recordingStream, options);
         recordingRecordedChunks = [];
         
@@ -251,7 +297,8 @@ async function handleRecordingComplete() {
     }
     
     // Create blob from chunks
-    const blob = new Blob(recordingRecordedChunks, { type: 'video/webm' });
+    const mimeType = recordingMediaRecorder && recordingMediaRecorder.mimeType ? recordingMediaRecorder.mimeType : '';
+    const blob = new Blob(recordingRecordedChunks, { type: mimeType || 'video/webm' });
     
     // Check file size (max 200MB)
     const maxSize = 200 * 1024 * 1024;
@@ -262,8 +309,9 @@ async function handleRecordingComplete() {
     }
     
     // Create file from blob
-    const filename = `recording_${Date.now()}.webm`;
-    const file = new File([blob], filename, { type: 'video/webm' });
+    const ext = extensionForMimeType(blob.type);
+    const filename = `recording_${Date.now()}.${ext}`;
+    const file = new File([blob], filename, { type: blob.type || 'video/webm' });
     
     // Upload the recording
     await uploadRecording(file, isScreenShare ? 'screen_share' : 'recording');
