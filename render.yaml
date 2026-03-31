@@ -9,9 +9,7 @@ services:
         generateValue: true
       - key: FLASK_ENV
         value: production
-      # DATABASE_URL should be set manually in Render dashboard:
-      # postgresql://talentschatdb_user:PexPT6558fFTGuly9RSPIe92nbVEMzEu@dpg-d5ir02n5r7bs73dk7cv0-a.oregon-postgres.render.com:5432/talentschatdb
-      # Or add it in the Render dashboard under Environment tab
+      # SQLite-only: do NOT set DATABASE_URL (Postgres disabled)
 
 
 
